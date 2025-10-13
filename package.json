@@ -8,7 +8,11 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "functions:build": "cd functions && npm run build",
+    "functions:deploy": "firebase deploy --only functions",
+    "functions:logs": "firebase functions:log",
+    "setup": "npm install && cd functions && npm install && cd .."
   },
   "repository": {
     "type": "git",
@@ -38,6 +42,9 @@
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.37.0",
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.5.0",
+    "firebase-tools": "^14.19.1",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.14",

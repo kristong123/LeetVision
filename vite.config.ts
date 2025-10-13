@@ -7,6 +7,7 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), crx({ manifest })],
+  base: './', // Use relative paths for browser extension
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

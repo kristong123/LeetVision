@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { addMessage, setLoading, setError } from '../redux/slices/appSlice';
 import { generateResponse } from '../services/gemini';
-import { getGeminiApiKey } from '../utils/storage';
 import browser from 'webextension-polyfill';
 import { hashCode } from '../utils/codeDetection';
 
@@ -80,19 +79,11 @@ const InputSection = () => {
     dispatch(setError(null));
 
     try {
-      const apiKey = await getGeminiApiKey();
-      if (!apiKey) {
-        throw new Error(
-          'No API key found. Please add your Gemini API key in settings.'
-        );
-      }
-
       const response = await generateResponse({
         code: selectedSection.content,
         mode,
         responseLength,
         userQuestion: question || undefined,
-        apiKey,
       });
 
       dispatch(

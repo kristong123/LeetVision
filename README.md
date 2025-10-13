@@ -18,59 +18,60 @@ AI-powered browser extension for code assistance and learning. Perfect for codin
 - **Build Tool**: Vite with Chrome Extension plugin
 - **Styling**: Tailwind CSS
 - **State Management**: Redux Toolkit
+- **Backend**: Firebase Functions (Cloud Functions)
 - **Authentication**: Firebase Auth
-- **AI Provider**: Google Gemini API (Free tier: 15 req/min, 1,500 req/day)
+- **Database**: Firestore (for rate limiting)
+- **AI Provider**: Google Gemini API (via secure backend)
 - **Browser Support**: Chrome, Firefox, Edge, Safari
+
+### Architecture
+
+```
+User → Extension → Firebase Function → Gemini API
+         ↓
+   Firebase Auth ← Rate Limiting (Firestore)
+```
+
+**Key Benefits**:
+- ✅ Users don't need their own API keys
+- ✅ API keys secured on backend
+- ✅ Built-in rate limiting (10 req/min per user)
+- ✅ 100% free for moderate usage
 
 ## Getting Started
 
-### Prerequisites
+**📖 For complete setup instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**
 
-- Node.js 18+
-- npm or pnpm
-- A modern browser
+### Quick Start
 
-### Installation
-
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/kristong123/LeetVision.git
    cd LeetVision
    ```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
+2. **Setup Firebase & Deploy Backend**:
+   - Follow [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for:
+     - Firebase project setup
+     - Environment configuration
+     - Backend deployment
 
-3. Create a `.env` file (see `.env.example` for template):
-   ```bash
-   cp .env.example .env
-   ```
-
-4. Add your API keys to `.env`:
-   - Follow the instructions in [SETUP.md](./SETUP.md) to get your Firebase and Gemini API keys
-
-5. Build the extension:
+3. **Build & Install Extension**:
    ```bash
    npm run build
-   # or for development with hot reload
-   npm run dev
    ```
-
-6. Load the extension in your browser:
-   - **Chrome/Edge**: 
-     1. Navigate to `chrome://extensions/`
-     2. Enable "Developer mode"
-     3. Click "Load unpacked"
-     4. Select the `dist/` folder
    
-   - **Firefox**:
-     1. Navigate to `about:debugging#/runtime/this-firefox`
-     2. Click "Load Temporary Add-on"
-     3. Select the `manifest.json` file in the `dist/` folder
+   Then load `dist/` folder in your browser:
+   - **Chrome**: `chrome://extensions/` → "Load unpacked"
+   - **Firefox**: `about:debugging` → "Load Temporary Add-on"
+
+### For End Users
+
+If someone has already deployed LeetVision:
+1. Install the extension from Chrome Web Store (or load unpacked)
+2. Click extension icon
+3. Sign up with email/password
+4. Start using! No API keys needed 🎉
 
 ## Usage
 
@@ -80,34 +81,43 @@ AI-powered browser extension for code assistance and learning. Perfect for codin
 4. **Ask Questions**: Type custom questions or use quick action buttons
 5. **Get Insights**: Receive AI-powered responses tailored to your chosen mode
 
-## Configuration
+## Documentation
 
-See [SETUP.md](./SETUP.md) for detailed setup instructions including:
-- Getting a free Google Gemini API key
-- Setting up Firebase authentication
-- Browser-specific installation steps
-- Troubleshooting tips
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Complete setup & deployment guide
+- **[SETUP.md](./SETUP.md)** - Quick reference
+- **[spec.md](./spec.md)** - Project specification
+
+### Key Documentation Topics
+
+- Firebase project setup
+- Environment configuration
+- Backend deployment (Firebase Functions)
+- Extension building and installation
+- Testing checklist
+- Troubleshooting guide
+- Cost breakdown (free tier)
 
 ## Project Structure
 
 ```
 LeetVision/
-├── src/
-│   ├── components/          # React components
-│   ├── redux/              # Redux store and slices
-│   ├── services/           # Firebase and Gemini API services
-│   ├── utils/              # Utility functions
-│   ├── content/            # Content script
-│   ├── background/         # Background service worker
-│   ├── types/              # TypeScript type definitions
-│   ├── styles/             # Global styles
-│   ├── App.tsx             # Main app component
-│   ├── main.tsx            # Entry point
-│   └── manifest.json       # Extension manifest
-├── public/                 # Static assets
-├── vite.config.ts          # Vite configuration
-├── tailwind.config.js      # Tailwind configuration
-└── tsconfig.json           # TypeScript configuration
+├── src/                    # Extension source code
+│   ├── components/         # React components
+│   ├── redux/             # Redux store and slices
+│   ├── services/          # Firebase and API services
+│   ├── utils/             # Utility functions
+│   ├── content/           # Content script (injected into pages)
+│   ├── background/        # Background service worker
+│   └── ...
+├── functions/             # Firebase Cloud Functions (Backend)
+│   ├── src/
+│   │   └── index.ts      # Main function (handles AI requests)
+│   ├── .env              # Gemini API key (create this)
+│   └── package.json
+├── .env                   # Firebase config (create this)
+├── firebase.json          # Firebase configuration
+├── dist/                  # Built extension (after npm run build)
+└── DEPLOYMENT_GUIDE.md    # Complete setup guide
 ```
 
 ## Development

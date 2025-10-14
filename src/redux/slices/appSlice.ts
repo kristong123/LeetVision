@@ -10,6 +10,7 @@ const initialState: AppState = {
   codeSections: [],
   selectedCodeSection: null,
   lastCodeHash: null,
+  hoverModeActive: false,
 };
 
 const appSlice = createSlice({
@@ -47,6 +48,12 @@ const appSlice = createSlice({
     setLastCodeHash: (state, action: PayloadAction<string | null>) => {
       state.lastCodeHash = action.payload;
     },
+    restoreAppState: (_state, action: PayloadAction<AppState>) => {
+      return { ...action.payload };
+    },
+    setHoverModeActive: (state, action: PayloadAction<boolean>) => {
+      state.hoverModeActive = action.payload;
+    },
   },
 });
 
@@ -60,6 +67,8 @@ export const {
   setCodeSections,
   setSelectedCodeSection,
   setLastCodeHash,
+  restoreAppState,
+  setHoverModeActive,
 } = appSlice.actions;
 
 export default appSlice.reducer;

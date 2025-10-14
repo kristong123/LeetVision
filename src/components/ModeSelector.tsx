@@ -3,9 +3,9 @@ import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { setMode } from '../redux/slices/appSlice';
 
 const modes: { value: Mode; label: string; color: string }[] = [
-  { value: 'learn', label: 'Learn Mode', color: 'bg-learn' },
-  { value: 'explain', label: 'Explain Mode', color: 'bg-explain' },
-  { value: 'improve', label: 'Improve Mode', color: 'bg-improve' },
+  { value: 'learn', label: 'Learn Mode', color: '#059669' },
+  { value: 'explain', label: 'Explain Mode', color: '#2563eb' },
+  { value: 'improve', label: 'Improve Mode', color: '#ea580c' },
 ];
 
 const ModeSelector = () => {
@@ -22,9 +22,12 @@ const ModeSelector = () => {
           <button
             key={mode.value}
             onClick={() => dispatch(setMode(mode.value))}
+            style={{
+              backgroundColor: currentMode === mode.value ? mode.color : undefined,
+            }}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
               currentMode === mode.value
-                ? `${mode.color} text-white shadow-md`
+                ? 'text-white shadow-md'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >

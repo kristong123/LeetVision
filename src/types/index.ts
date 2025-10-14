@@ -36,6 +36,7 @@ export interface AppState {
   codeSections: CodeSection[];
   selectedCodeSection: string | null;
   lastCodeHash: string | null;
+  hoverModeActive: boolean;
 }
 
 export interface UserState {

@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { detectCodeSections, hashCode } from '../utils/codeDetection';
+import { enableHoverMode, disableHoverMode, isHoverActive } from './codeHoverDetector';
 
 console.log('LeetVision content script loaded');
 
@@ -8,6 +9,20 @@ browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
   if (message.type === 'SCAN_CODE') {
     const codeSections = detectCodeSections();
     sendResponse({ success: true, codeSections });
+  }
+
+  if (message.type === 'ENABLE_HOVER_MODE') {
+    enableHoverMode();
+    sendResponse({ success: true });
+  }
+
+  if (message.type === 'DISABLE_HOVER_MODE') {
+    disableHoverMode();
+    sendResponse({ success: true });
+  }
+
+  if (message.type === 'CHECK_HOVER_MODE') {
+    sendResponse({ isActive: isHoverActive() });
   }
 
   if (message.type === 'GET_CODE_HASH') {

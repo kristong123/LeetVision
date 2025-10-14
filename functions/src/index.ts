@@ -8,7 +8,7 @@ dotenv.config();
 // Initialize Firebase Admin
 admin.initializeApp();
 
-const GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 interface GeminiRequestBody {
   code: string;
@@ -18,7 +18,7 @@ interface GeminiRequestBody {
 }
 
 // Rate limiting configuration (stored in Firestore)
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_WINDOW = 60000; // 1 minute  
 const FREE_TIER_REQUESTS_PER_MINUTE = 10;
 
 /**

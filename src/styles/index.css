@@ -1,11 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-* {
+@theme {
+  --color-learn: #059669;
+  --color-learn-light: #10b981;
+  --color-learn-dark: #047857;
+  --color-explain: #2563eb;
+  --color-explain-light: #3b82f6;
+  --color-explain-dark: #1d4ed8;
+  --color-improve: #ea580c;
+  --color-improve-light: #f97316;
+  --color-improve-dark: #c2410c;
+}
+
+html, body {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 body {
@@ -16,12 +27,34 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+#root {
+  overscroll-behavior: none;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
 
-/* Custom scrollbar */
+/* Hide scrollbars on html and body */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+body {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar for inner elements that need it */
 ::-webkit-scrollbar {
   width: 8px;
 }

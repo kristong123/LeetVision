@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useAppDispatch } from './redux/hooks';
+import { useAppDispatch, useAppSelector } from './redux/hooks';
 import { setUser, setPreferences } from './redux/slices/userSlice';
-import { setMode, setResponseLength } from './redux/slices/appSlice';
+import { setMode, setResponseLength, restoreAppState } from './redux/slices/appSlice';
 import { onAuthChange } from './services/firebase';
 import { getPreferences } from './utils/storage';
+import { restoreState, saveState } from './utils/statePersistence';
 import Header from './components/Header';
 import ModeSelector from './components/ModeSelector';
 import ResponseLengthSlider from './components/ResponseLengthSlider';
@@ -15,10 +16,18 @@ import Auth from './components/Auth';
 
 function App() {
   const dispatch = useAppDispatch();
+  const appState = useAppSelector((state) => state.app);
   const [showSettings, setShowSettings] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
+    // Restore state from storage first
+    restoreState().then((savedState) => {
+      if (savedState) {
+        dispatch(restoreAppState(savedState));
+      }
+    });
+
     // Load preferences
     getPreferences().then((prefs) => {
       dispatch(setPreferences(prefs));
@@ -51,8 +60,18 @@ function App() {
     return () => unsubscribe();
   }, [dispatch]);
 
+  // Save state whenever appState changes
+  useEffect(() => {
+    // Don't save initial state immediately
+    const timeout = setTimeout(() => {
+      saveState(appState);
+    }, 300); // Debounce saves
+
+    return () => clearTimeout(timeout);
+  }, [appState]);
+
   return (
-    <div className="w-[400px] h-[600px] flex flex-col bg-white dark:bg-gray-900">
+    <div className="w-[400px] h-fit p-3 flex flex-col bg-white dark:bg-gray-900" style={{ overscrollBehavior: 'none' }}>
       <Header
         onSettingsClick={() => setShowSettings(true)}
         onAuthClick={() => setShowAuth(true)}

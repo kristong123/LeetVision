@@ -12,7 +12,7 @@ const ChatBox = () => {
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
+      <div className="flex items-center justify-center px-4 py-8">
         <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
           Scan the page or ask a question to get started
         </p>
@@ -21,7 +21,7 @@ const ChatBox = () => {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+    <div className="px-4 py-3 space-y-3 max-h-64 overflow-y-auto">
       {messages.map((message) => (
         <div
           key={message.id}

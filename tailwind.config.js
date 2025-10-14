@@ -7,25 +7,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        learn: {
-          light: '#10b981',
-          DEFAULT: '#059669',
-          dark: '#047857',
-        },
-        explain: {
-          light: '#3b82f6',
-          DEFAULT: '#2563eb',
-          dark: '#1d4ed8',
-        },
-        improve: {
-          light: '#f97316',
-          DEFAULT: '#ea580c',
-          dark: '#c2410c',
-        },
+        'learn': '#059669',
+        'learn-light': '#10b981',
+        'learn-dark': '#047857',
+        'explain': '#2563eb',
+        'explain-light': '#3b82f6',
+        'explain-dark': '#1d4ed8',
+        'improve': '#ea580c',
+        'improve-light': '#f97316',
+        'improve-dark': '#c2410c',
       },
     },
   },
   darkMode: 'class',
   plugins: [],
+  safelist: [
+    'bg-learn',
+    'bg-learn-light',
+    'bg-learn-dark',
+    'bg-explain',
+    'bg-explain-light',
+    'bg-explain-dark',
+    'bg-improve',
+    'bg-improve-light',
+    'bg-improve-dark',
+    'hover:bg-learn-dark',
+    'hover:bg-explain-dark',
+    'hover:bg-improve-dark',
+  ],
 }
 

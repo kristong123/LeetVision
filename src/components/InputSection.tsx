@@ -56,9 +56,9 @@ const InputSection = () => {
       }
     }
 
-    const question = customQuestion || input;
+    const question = customQuestion !== undefined ? customQuestion : input;
 
-    if (!customQuestion && !input.trim()) {
+    if (customQuestion === undefined && !input.trim()) {
       return;
     }
 
@@ -132,15 +132,17 @@ const InputSection = () => {
         </button>
       </div>
       <button
-        onClick={() => handleSubmit()}
+        onClick={() => handleSubmit('')}
         disabled={isLoading}
-        className={`w-full py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          mode === 'learn'
-            ? 'bg-learn hover:bg-learn-dark'
-            : mode === 'explain'
-            ? 'bg-explain hover:bg-explain-dark'
-            : 'bg-improve hover:bg-improve-dark'
-        } text-white`}
+        style={{
+          backgroundColor:
+            mode === 'learn'
+              ? '#059669'
+              : mode === 'explain'
+              ? '#2563eb'
+              : '#ea580c',
+        }}
+        className="w-full py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white hover:opacity-90"
       >
         {quickActionButtons[mode]}
       </button>

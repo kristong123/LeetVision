@@ -6,53 +6,45 @@ console.log('LeetVision content script loaded');
 
 // Listen for messages from popup or background script
 browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
-  if (message.type === 'SCAN_CODE') {
-    const codeSections = detectCodeSections();
-    sendResponse({ success: true, codeSections });
-  }
-
-  if (message.type === 'ENABLE_HOVER_MODE') {
-    enableHoverMode();
-    sendResponse({ success: true });
-  }
-
-  if (message.type === 'DISABLE_HOVER_MODE') {
-    disableHoverMode();
-    sendResponse({ success: true });
-  }
-
-  if (message.type === 'CHECK_HOVER_MODE') {
-    sendResponse({ isActive: isHoverActive() });
-  }
-
-  if (message.type === 'GET_CODE_HASH') {
-    const codeSections = detectCodeSections();
-    if (codeSections.length > 0) {
-      const selectedSection = codeSections.find(
-        (section) => section.id === message.sectionId
-      );
-      if (selectedSection) {
-        const hash = hashCode(selectedSection.content);
-        sendResponse({ success: true, hash });
+  // Handle all message types synchronously
+  try {
+    if (message.type === 'SCAN_CODE') {
+      const codeSections = detectCodeSections();
+      sendResponse({ success: true, codeSections });
+    } else if (message.type === 'ENABLE_HOVER_MODE') {
+      enableHoverMode();
+      sendResponse({ success: true });
+    } else if (message.type === 'DISABLE_HOVER_MODE') {
+      disableHoverMode();
+      sendResponse({ success: true });
+    } else if (message.type === 'CHECK_HOVER_MODE') {
+      sendResponse({ isActive: isHoverActive() });
+    } else if (message.type === 'GET_CODE_HASH') {
+      const codeSections = detectCodeSections();
+      if (codeSections.length > 0) {
+        const selectedSection = codeSections.find(
+          (section) => section.id === message.sectionId
+        );
+        if (selectedSection) {
+          const hash = hashCode(selectedSection.content);
+          sendResponse({ success: true, hash });
+        } else {
+          sendResponse({ success: false, error: 'Code section not found' });
+        }
       } else {
-        sendResponse({ success: false, error: 'Code section not found' });
+        sendResponse({ success: false, error: 'No code found' });
       }
-    } else {
-      sendResponse({ success: false, error: 'No code found' });
+    } else if (message.type === 'HIGHLIGHT_CODE') {
+      sendResponse({ success: true });
+    } else if (message.type === 'REMOVE_HIGHLIGHT') {
+      sendResponse({ success: true });
     }
+  } catch (error) {
+    console.error('Error in content script message handler:', error);
+    sendResponse({ success: false, error: String(error) });
   }
-
-  if (message.type === 'HIGHLIGHT_CODE') {
-    // TODO: Implement highlighting by re-detecting the element
-    sendResponse({ success: true });
-  }
-
-  if (message.type === 'REMOVE_HIGHLIGHT') {
-    // TODO: Implement removing highlights
-    sendResponse({ success: true });
-  }
-
-  // Return true to indicate we'll send a response asynchronously
+  
+  // Return true to keep the message channel open for the response
   return true;
 });
 
@@ -72,6 +64,8 @@ const checkCodeChanges = () => {
       browser.runtime.sendMessage({
         type: 'CODE_CHANGED',
         hash: currentHash,
+      }).catch(() => {
+        // Popup might be closed, ignore error
       });
     }
   }
@@ -94,4 +88,30 @@ observer.observe(document.body, {
 
 // Initial check
 checkCodeChanges();
+
+// Update navigation timestamp when page loads to detect refreshes
+// Only clear selected code if this is a new page navigation
+browser.storage.local.get('leetvision_last_navigation').then((result) => {
+  const previousTimestamp = result.leetvision_last_navigation as number | undefined;
+  const currentTimestamp = Date.now();
+  
+  // Only clear selected code if this is a new page navigation
+  // Check if timestamps differ by more than 1 second (indicating a real navigation)
+  if (previousTimestamp && typeof previousTimestamp === 'number' && Math.abs(currentTimestamp - previousTimestamp) > 1000) {
+    // Different navigation, clear selected code
+    return browser.storage.local.remove('leetvision_selected_code').then(() => {
+      // Update navigation timestamp
+      return browser.storage.local.set({ 
+        leetvision_last_navigation: currentTimestamp 
+      });
+    });
+  }
+  
+  // Update navigation timestamp for first load or same session
+  return browser.storage.local.set({ 
+    leetvision_last_navigation: currentTimestamp 
+  });
+}).catch(() => {
+  // Ignore errors
+});
 

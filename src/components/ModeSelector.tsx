@@ -11,6 +11,8 @@ const modes: { value: Mode; label: string; color: string }[] = [
 const ModeSelector = () => {
   const dispatch = useAppDispatch();
   const currentMode = useAppSelector((state) => state.app.mode);
+  const codeSections = useAppSelector((state) => state.app.codeSections);
+  const hasCode = codeSections.length > 0;
 
   return (
     <div className="px-4 py-3">
@@ -21,7 +23,8 @@ const ModeSelector = () => {
         {modes.map((mode) => (
           <button
             key={mode.value}
-            onClick={() => dispatch(setMode(mode.value))}
+            onClick={() => hasCode && dispatch(setMode(mode.value))}
+            disabled={!hasCode}
             style={{
               backgroundColor: currentMode === mode.value ? mode.color : undefined,
             }}
@@ -29,7 +32,7 @@ const ModeSelector = () => {
               currentMode === mode.value
                 ? 'text-white shadow-md'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
+            } ${!hasCode ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {mode.label}
           </button>

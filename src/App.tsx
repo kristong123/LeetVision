@@ -5,6 +5,7 @@ import { setMode, setResponseLength, restoreAppState } from './redux/slices/appS
 import { onAuthChange } from './services/firebase';
 import { getPreferences } from './utils/storage';
 import { restoreState, saveState } from './utils/statePersistence';
+import browser from 'webextension-polyfill';
 import Header from './components/Header';
 import ModeSelector from './components/ModeSelector';
 import ResponseLengthSlider from './components/ResponseLengthSlider';
@@ -21,11 +22,37 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
-    // Restore state from storage first
-    restoreState().then((savedState) => {
-      if (savedState) {
-        dispatch(restoreAppState(savedState));
-      }
+    // Load selected code first, then restore other state
+    browser.storage.local.get('leetvision_selected_code').then((result) => {
+      const selectedCode: any = result.leetvision_selected_code;
+      
+      return restoreState().then((savedState) => {
+        if (savedState) {
+          // If we have selected code in storage, merge it into the restored state
+          if (selectedCode && selectedCode.code) {
+            browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+              const isSamePage = tab?.url && selectedCode.source === tab.url;
+              
+              if (isSamePage) {
+                // Merge selected code into restored state
+                const codeSection = {
+                  id: `hover-${Date.now()}`,
+                  content: selectedCode.code,
+                  language: selectedCode.language || 'plaintext',
+                };
+                
+                savedState.codeSections = [codeSection];
+                savedState.selectedCodeSection = codeSection.id;
+                savedState.hoverModeActive = false;
+              }
+              
+              dispatch(restoreAppState(savedState));
+            });
+          } else {
+            dispatch(restoreAppState(savedState));
+          }
+        }
+      });
     });
 
     // Load preferences
@@ -76,11 +103,9 @@ function App() {
         onSettingsClick={() => setShowSettings(true)}
         onAuthClick={() => setShowAuth(true)}
       />
-
       <ModeSelector />
       <ResponseLengthSlider />
       <CodeSelector />
-
       <ChatBox />
       <InputSection />
 

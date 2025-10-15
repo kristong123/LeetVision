@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { addMessage, setLoading, setError } from '../redux/slices/appSlice';
 import { generateResponse } from '../services/gemini';
+import { Send } from 'lucide-react';
 import browser from 'webextension-polyfill';
 import { hashCode } from '../utils/codeDetection';
 
@@ -18,6 +19,8 @@ const InputSection = () => {
 
   const [input, setInput] = useState('');
 
+  const hasCodeSelected = codeSections.length > 0 && selectedCodeSection;
+
   const quickActionButtons = {
     learn: 'Hint',
     explain: 'Explain',
@@ -25,7 +28,7 @@ const InputSection = () => {
   };
 
   const handleSubmit = async (customQuestion?: string) => {
-    if (isLoading) return;
+    if (isLoading || !hasCodeSelected) return;
 
     // Check if we need to scan/rescan
     const selectedSection = codeSections.find(
@@ -119,21 +122,22 @@ const InputSection = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="Ask anything..."
-          disabled={isLoading}
+          placeholder={!hasCodeSelected ? "Select code first..." : "Ask anything..."}
+          disabled={!hasCodeSelected || isLoading}
           className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
         />
         <button
           onClick={() => handleSubmit()}
-          disabled={isLoading || !input.trim()}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          disabled={!input.trim() || !hasCodeSelected || isLoading}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
+          <Send className="w-4 h-4" />
           Send
         </button>
       </div>
       <button
         onClick={() => handleSubmit('')}
-        disabled={isLoading}
+        disabled={!hasCodeSelected || isLoading}
         style={{
           backgroundColor:
             mode === 'learn'

@@ -1,13 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import { setCodeSections, setHoverModeActive } from '../redux/slices/appSlice';
+import { setCodeSections, setHoverModeActive, setSelectedCodeSection } from '../redux/slices/appSlice';
 import browser from 'webextension-polyfill';
+import { Eye, Check } from 'lucide-react';
 
 const CodeSelector = () => {
   const dispatch = useAppDispatch();
   const hoverModeActive = useAppSelector((state) => state.app.hoverModeActive);
   const codeSections = useAppSelector((state) => state.app.codeSections);
   const isLoading = useAppSelector((state) => state.app.isLoading);
+  const [showCodePreview, setShowCodePreview] = useState(false);
 
   const toggleHoverMode = async () => {
     try {
@@ -21,11 +23,19 @@ const CodeSelector = () => {
       }
 
       if (!hoverModeActive) {
-        // Enable hover mode
-        await browser.tabs.sendMessage(tab.id, {
+        // Enable hover mode and close popup
+        // Don't await - we're closing the popup immediately
+        browser.tabs.sendMessage(tab.id, {
           type: 'ENABLE_HOVER_MODE',
+        }).catch((error) => {
+          // Popup will be closed, so just log the error
+          console.error('Error enabling hover mode:', error);
         });
+        
         dispatch(setHoverModeActive(true));
+        
+        // Close the popup so user can select code on the page
+        window.close();
       } else {
         // Disable hover mode
         await browser.tabs.sendMessage(tab.id, {
@@ -56,6 +66,7 @@ const CodeSelector = () => {
           language: message.language,
         };
         dispatch(setCodeSections([codeSection]));
+        dispatch(setSelectedCodeSection(codeSection.id));
         // Disable hover mode immediately when code is selected
         dispatch(setHoverModeActive(false));
       }
@@ -73,10 +84,12 @@ const CodeSelector = () => {
     };
   }, [dispatch]);
 
-  // Check hover mode status when popup opens
+  // Note: Selected code loading is now handled in App.tsx to prevent race conditions
+  // This useEffect has been removed to consolidate state loading logic
+
+  // Check hover mode status separately
   useEffect(() => {
     const checkHoverModeStatus = async () => {
-      // If hover mode is active in state, verify with content script
       if (hoverModeActive) {
         try {
           const [tab] = await browser.tabs.query({
@@ -85,25 +98,30 @@ const CodeSelector = () => {
           });
 
           if (tab?.id) {
-            // Query content script for actual hover mode status
-            const response: any = await browser.tabs.sendMessage(tab.id, {
-              type: 'CHECK_HOVER_MODE',
-            });
-            
-            if (response && !response.isActive) {
-              // Content script says hover mode is off, update state
+            try {
+              const response: any = await browser.tabs.sendMessage(tab.id, {
+                type: 'CHECK_HOVER_MODE',
+              });
+              
+              if (response && !response.isActive) {
+                dispatch(setHoverModeActive(false));
+              }
+            } catch (msgError) {
+              // Message channel closed or content script not ready
+              // Assume hover mode is off
+              console.log('Could not check hover mode status, assuming off');
               dispatch(setHoverModeActive(false));
             }
           }
         } catch (error) {
-          // Content script not available, assume hover mode is off
+          console.error('Error checking hover mode:', error);
           dispatch(setHoverModeActive(false));
         }
       }
     };
 
     checkHoverModeStatus();
-  }, [hoverModeActive, dispatch]); // Run when hoverModeActive changes
+  }, [hoverModeActive, dispatch]);
 
   return (
     <div className="px-4 py-3">
@@ -116,7 +134,14 @@ const CodeSelector = () => {
             : 'bg-gray-800 dark:bg-gray-600 text-white hover:bg-gray-700 dark:hover:bg-gray-500'
         }`}
       >
-        {hoverModeActive ? '✓ Hover Mode Active' : 'Select Code on Page'}
+        {hoverModeActive ? (
+          <>
+            <Check className="w-4 h-4 inline mr-1" />
+            Hover Mode Active
+          </>
+        ) : (
+          'Select Code on Page'
+        )}
       </button>
 
       {hoverModeActive && (
@@ -131,14 +156,27 @@ const CodeSelector = () => {
       )}
 
       {codeSections.length > 0 && !hoverModeActive && (
-        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-          <p className="text-sm text-green-900 dark:text-green-100">
-            ✓ Code selected ({codeSections[0].content.length} characters)
-          </p>
-          {codeSections[0].language && (
-            <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-              Language: {codeSections[0].language}
+        <div className="mt-3">
+          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <p className="text-sm text-green-900 dark:text-green-100 flex items-center">
+              <Check className="w-4 h-4 mr-1" />
+              Code selected
             </p>
+            <button
+              onClick={() => setShowCodePreview(!showCodePreview)}
+              className="p-1 hover:bg-green-100 dark:hover:bg-green-800 rounded transition-colors"
+              title="Preview code"
+            >
+              <Eye className="w-5 h-5 text-green-700 dark:text-green-300" />
+            </button>
+          </div>
+          
+          {showCodePreview && (
+            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto">
+              <pre className="text-xs text-gray-900 dark:text-gray-100 whitespace-pre-wrap font-mono">
+                {codeSections[0].content}
+              </pre>
+            </div>
           )}
         </div>
       )}

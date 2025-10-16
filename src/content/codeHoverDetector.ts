@@ -1,44 +1,25 @@
 import browser from 'webextension-polyfill';
 
-const LEETVISION_HOVER_CLASS = 'leetvision-code-hover';
-const LEETVISION_SELECTED_CLASS = 'leetvision-code-selected';
-
+// State variables
 let isHoverModeActive = false;
 let codeElements: HTMLElement[] = [];
 let selectedElement: HTMLElement | null = null;
-let styleElement: HTMLStyleElement | null = null;
 let tooltipElement: HTMLDivElement | null = null;
+let overlayElement: HTMLDivElement | null = null;
+let highlightBoxes: Map<HTMLElement, HTMLDivElement> = new Map();
+let selectedBox: HTMLDivElement | null = null;
+let updatePositionsOnResize: (() => void) | null = null;
 
 /**
- * Inject CSS styles for hover effects
+ * Create and show tooltip
  */
-function injectStyles() {
-  if (styleElement) return;
-
-  styleElement = document.createElement('style');
-  styleElement.textContent = `
-    .${LEETVISION_HOVER_CLASS} {
-      outline: 3px solid #2563eb !important;
-      outline-offset: 1px !important;
-      cursor: pointer !important;
-      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15), inset 0 0 0 9999px rgba(37, 99, 235, 0.03) !important;
-      transition: all 0.15s ease !important;
-    }
-    
-    .leetvision-code-active-hover {
-      outline: 4px solid #2563eb !important;
-      box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25), inset 0 0 0 9999px rgba(37, 99, 235, 0.05) !important;
-    }
-    
-    .${LEETVISION_SELECTED_CLASS} {
-      outline: 3px solid #059669 !important;
-      outline-offset: 1px !important;
-      box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.15), inset 0 0 0 9999px rgba(5, 150, 105, 0.03) !important;
-    }
-    
-    #leetvision-tooltip {
+function showTooltip(box: HTMLDivElement, text: string, isSuccess: boolean = false) {
+  if (!tooltipElement) {
+    tooltipElement = document.createElement('div');
+    tooltipElement.id = 'leetvision-tooltip';
+    tooltipElement.style.cssText = `
       position: fixed;
-      background: #2563eb;
+      background: ${isSuccess ? '#059669' : '#2563eb'};
       color: white;
       padding: 6px 12px;
       border-radius: 6px;
@@ -48,30 +29,16 @@ function injectStyles() {
       z-index: 2147483647;
       pointer-events: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      opacity: 0;
       transition: opacity 0.15s ease;
-    }
-    
-    #leetvision-tooltip.success {
-      background: #059669;
-    }
-  `;
-  document.head.appendChild(styleElement);
-}
-
-/**
- * Create and show tooltip
- */
-function showTooltip(element: HTMLElement, text: string, isSuccess: boolean = false) {
-  if (!tooltipElement) {
-    tooltipElement = document.createElement('div');
-    tooltipElement.id = 'leetvision-tooltip';
+    `;
     document.body.appendChild(tooltipElement);
   }
   
   tooltipElement.textContent = text;
-  tooltipElement.className = isSuccess ? 'success' : '';
+  tooltipElement.style.background = isSuccess ? '#059669' : '#2563eb';
   
-  const rect = element.getBoundingClientRect();
+  const rect = box.getBoundingClientRect();
   tooltipElement.style.left = `${rect.left + rect.width / 2}px`;
   tooltipElement.style.top = `${rect.top - 10}px`;
   tooltipElement.style.transform = 'translate(-50%, -100%)';
@@ -85,6 +52,315 @@ function hideTooltip() {
   if (tooltipElement) {
     tooltipElement.style.opacity = '0';
   }
+}
+
+/**
+ * Create overlay element
+ */
+function createOverlay(): HTMLDivElement {
+  const overlay = document.createElement('div');
+  overlay.id = 'leetvision-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 2147483647;
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+/**
+ * Clip a rect to the viewport bounds
+ */
+function clipToViewport(rect: DOMRect): DOMRect {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  // Calculate clipped bounds
+  const left = Math.max(0, rect.left);
+  const top = Math.max(0, rect.top);
+  const right = Math.min(viewportWidth, rect.right);
+  const bottom = Math.min(viewportHeight, rect.bottom);
+  
+  // If the element is completely off-screen, return a minimal rect
+  if (right <= left || bottom <= top) {
+    return new DOMRect(0, 0, 0, 0);
+  }
+  
+  return new DOMRect(
+    left,
+    top,
+    right - left,
+    bottom - top
+  );
+}
+
+/**
+ * Get the best bounding rect for a code element
+ * For Monaco editors, target the actual code viewport
+ */
+function getCodeElementRect(element: HTMLElement): DOMRect {
+  let rect: DOMRect;
+  
+  // For Monaco editor, try to find the scrollable content area
+  if (element.classList.contains('monaco-editor')) {
+    // Try overflow-guard first (this is the visible viewport container)
+    const overflowGuard = element.querySelector('.overflow-guard');
+    if (overflowGuard) {
+      rect = overflowGuard.getBoundingClientRect();
+      return clipToViewport(rect);
+    }
+    
+    // Try the editor's parent container with explicit dimensions
+    const parent = element.parentElement;
+    if (parent && parent.offsetHeight > 0 && parent.offsetWidth > 0) {
+      rect = parent.getBoundingClientRect();
+      return clipToViewport(rect);
+    }
+    
+    // Try view-lines (actual code lines)
+    const viewLines = element.querySelector('.view-lines');
+    if (viewLines) {
+      rect = viewLines.getBoundingClientRect();
+      return clipToViewport(rect);
+    }
+    
+    // Try lines-content as fallback
+    const linesContent = element.querySelector('.lines-content');
+    if (linesContent) {
+      rect = linesContent.getBoundingClientRect();
+      return clipToViewport(rect);
+    }
+    
+    // Try scrollable-element as last resort
+    const scrollableElement = element.querySelector('.monaco-scrollable-element');
+    if (scrollableElement) {
+      rect = scrollableElement.getBoundingClientRect();
+      return clipToViewport(rect);
+    }
+  }
+  
+  // For CodeMirror, try to find the actual code area
+  if (element.classList.contains('CodeMirror')) {
+    const lines = element.querySelector('.CodeMirror-lines');
+    if (lines) {
+      rect = lines.getBoundingClientRect();
+      return clipToViewport(rect);
+    }
+  }
+  
+  // Default: use element's own rect, clipped to viewport
+  rect = element.getBoundingClientRect();
+  return clipToViewport(rect);
+}
+
+/**
+ * Create highlight box for a code element
+ */
+function createHighlightBox(element: HTMLElement): HTMLDivElement {
+  const rect = getCodeElementRect(element);
+  const box = document.createElement('div');
+  
+  box.style.cssText = `
+    position: absolute;
+    left: ${rect.left}px;
+    top: ${rect.top}px;
+    width: ${rect.width}px;
+    height: ${rect.height}px;
+    outline: 3px solid #2563eb;
+    background: rgba(37, 99, 235, 0.03);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+    transition: none;
+    pointer-events: auto;
+    cursor: pointer;
+  `;
+  
+  // Store reference to original element
+  (box as any)._codeElement = element;
+  
+  // Add event listeners to box
+  box.addEventListener('mouseenter', handleBoxMouseEnter);
+  box.addEventListener('mouseleave', handleBoxMouseLeave);
+  box.addEventListener('click', handleBoxClick);
+  
+  return box;
+}
+
+/**
+ * Update positions of all highlight boxes
+ */
+function updatePositions() {
+  // Update all highlight boxes
+  highlightBoxes.forEach((box, element) => {
+    const rect = getCodeElementRect(element);
+    box.style.left = `${rect.left}px`;
+    box.style.top = `${rect.top}px`;
+    box.style.width = `${rect.width}px`;
+    box.style.height = `${rect.height}px`;
+  });
+  
+  // Also update the selected box if it exists
+  if (selectedBox && selectedElement) {
+    const rect = getCodeElementRect(selectedElement);
+    selectedBox.style.left = `${rect.left}px`;
+    selectedBox.style.top = `${rect.top}px`;
+    selectedBox.style.width = `${rect.width}px`;
+    selectedBox.style.height = `${rect.height}px`;
+  }
+}
+
+/**
+ * Debounce helper
+ */
+function debounce(func: () => void, wait: number): () => void {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction() {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(), wait);
+  };
+}
+
+/**
+ * Handle mouse enter on highlight box
+ */
+function handleBoxMouseEnter(this: HTMLDivElement) {
+  if (!isHoverModeActive) return;
+  if (this === selectedBox) return;
+  
+  // Active hover style
+  this.style.outline = '4px solid #2563eb';
+  this.style.background = 'rgba(37, 99, 235, 0.05)';
+  this.style.boxShadow = '0 0 0 6px rgba(37, 99, 235, 0.25)';
+  
+  showTooltip(this, 'Click to select this code');
+}
+
+/**
+ * Handle mouse leave on highlight box
+ */
+function handleBoxMouseLeave(this: HTMLDivElement) {
+  if (this === selectedBox) return;
+  
+  // Reset to default hover style
+  this.style.outline = '3px solid #2563eb';
+  this.style.background = 'rgba(37, 99, 235, 0.03)';
+  this.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.15)';
+  
+  hideTooltip();
+}
+
+/**
+ * Handle click on highlight box
+ */
+function handleBoxClick(this: HTMLDivElement, event: MouseEvent) {
+  if (!isHoverModeActive) return;
+  
+  event.preventDefault();
+  event.stopPropagation();
+  
+  // Get the original code element
+  const element = (this as any)._codeElement as HTMLElement;
+  if (!element) return;
+  
+  // Remove previous selection completely
+  if (selectedBox) {
+    selectedBox.remove();
+    selectedBox = null;
+    selectedElement = null;
+  }
+  
+  // Mark as selected
+  selectedElement = element;
+  selectedBox = this;
+  
+  // Apply selected styling
+  this.style.outline = '3px solid #059669';
+  this.style.background = 'rgba(5, 150, 105, 0.03)';
+  this.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.15)';
+  
+  // Show success tooltip
+  showTooltip(this, '✓ Code selected!', true);
+  
+  // Extract code content based on element type
+  let codeContent = '';
+  let language = 'plaintext';
+  
+  if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+    // Get value from input/textarea
+    const inputElement = element as HTMLInputElement | HTMLTextAreaElement;
+    codeContent = inputElement.value;
+  } else if (element.classList.contains('monaco-editor') || element.querySelector('.monaco-editor')) {
+    // Monaco editor - use specialized extraction
+    const monacoEl = element.classList.contains('monaco-editor') ? element : element.querySelector('.monaco-editor') as HTMLElement;
+    if (monacoEl) {
+      codeContent = extractMonacoCode(monacoEl);
+      language = detectMonacoLanguage(monacoEl);
+    }
+  } else if (element.classList.contains('CodeMirror')) {
+    // CodeMirror editor
+    const cmElement = element as any;
+    if (cmElement.CodeMirror && cmElement.CodeMirror.getValue) {
+      codeContent = cmElement.CodeMirror.getValue();
+    } else {
+      codeContent = element.textContent || '';
+    }
+  } else if (element.classList.contains('ace_editor')) {
+    // ACE editor
+    const aceElement = element as any;
+    if (aceElement.env && aceElement.env.editor && aceElement.env.editor.getValue) {
+      codeContent = aceElement.env.editor.getValue();
+    } else {
+      codeContent = element.textContent || '';
+    }
+  } else {
+    // Regular code block
+    codeContent = element.textContent || '';
+  }
+  
+  // Try to detect language from class names if not already detected
+  if (language === 'plaintext') {
+    const classNames = element.className;
+    const languageMatch = classNames.match(/language-(\w+)|lang-(\w+)/);
+    if (languageMatch) {
+      language = languageMatch[1] || languageMatch[2];
+    }
+  }
+  
+  // Save to chrome.storage.local immediately (popup is likely closed)
+  const selectedCode = {
+    code: codeContent.trim(),
+    language: language,
+    source: window.location.href,
+    timestamp: Date.now(),
+  };
+  
+  browser.storage.local.set({ leetvision_selected_code: selectedCode }).then(() => {
+    console.log('LeetVision: Code saved to storage', { length: codeContent.length, language });
+  });
+  
+  // Also send message in case popup is still open
+  browser.runtime.sendMessage({
+    type: 'CODE_SELECTED',
+    code: codeContent.trim(),
+    language: language,
+    source: window.location.href,
+  }).catch(() => {
+    // Popup likely closed, that's fine - we saved to storage
+  });
+  
+  // Hide tooltip after a brief moment
+  setTimeout(() => {
+    hideTooltip();
+  }, 1500);
+  
+  // Automatically disable hover mode after successful selection
+  setTimeout(() => {
+    disableHoverMode();
+  }, 500); // Small delay to show selection feedback
 }
 
 /**
@@ -186,24 +462,6 @@ function findCodeElements(): HTMLElement[] {
 }
 
 /**
- * Handle mouse enter on code element
- */
-function handleMouseEnter(this: HTMLElement) {
-  if (!isHoverModeActive) return;
-  if (this === selectedElement) return;
-  this.classList.add('leetvision-code-active-hover');
-  showTooltip(this, 'Click to select this code');
-}
-
-/**
- * Handle mouse leave on code element
- */
-function handleMouseLeave(this: HTMLElement) {
-  this.classList.remove('leetvision-code-active-hover');
-  hideTooltip();
-}
-
-/**
  * Extract Monaco editor code using multiple methods
  */
 function extractMonacoCode(element: HTMLElement): string {
@@ -287,127 +545,12 @@ function detectMonacoLanguage(element: HTMLElement): string {
 }
 
 /**
- * Handle click on code element
- */
-function handleClick(this: HTMLElement, event: MouseEvent) {
-  if (!isHoverModeActive) return;
-  
-  event.preventDefault();
-  event.stopPropagation();
-  
-  // Remove previous selection
-  if (selectedElement) {
-    selectedElement.classList.remove(LEETVISION_SELECTED_CLASS);
-    selectedElement.classList.remove(LEETVISION_HOVER_CLASS);
-  }
-  
-  // Mark as selected
-  selectedElement = this;
-  this.classList.remove(LEETVISION_HOVER_CLASS);
-  this.classList.remove('leetvision-code-active-hover');
-  this.classList.add(LEETVISION_SELECTED_CLASS);
-  
-  // Show success tooltip
-  showTooltip(this, '✓ Code selected!', true);
-  
-  // Extract code content based on element type
-  let codeContent = '';
-  let language = 'plaintext';
-  
-  if (this.tagName === 'TEXTAREA' || this.tagName === 'INPUT') {
-    // Get value from input/textarea
-    const inputElement = this as HTMLInputElement | HTMLTextAreaElement;
-    codeContent = inputElement.value;
-  } else if (this.classList.contains('monaco-editor') || this.querySelector('.monaco-editor')) {
-    // Monaco editor - use specialized extraction
-    const monacoEl = this.classList.contains('monaco-editor') ? this : this.querySelector('.monaco-editor') as HTMLElement;
-    if (monacoEl) {
-      codeContent = extractMonacoCode(monacoEl);
-      language = detectMonacoLanguage(monacoEl);
-    }
-  } else if (this.classList.contains('CodeMirror')) {
-    // CodeMirror editor
-    const cmElement = this as any;
-    if (cmElement.CodeMirror && cmElement.CodeMirror.getValue) {
-      codeContent = cmElement.CodeMirror.getValue();
-    } else {
-      codeContent = this.textContent || '';
-    }
-  } else if (this.classList.contains('ace_editor')) {
-    // ACE editor
-    const aceElement = this as any;
-    if (aceElement.env && aceElement.env.editor && aceElement.env.editor.getValue) {
-      codeContent = aceElement.env.editor.getValue();
-    } else {
-      codeContent = this.textContent || '';
-    }
-  } else {
-    // Regular code block
-    codeContent = this.textContent || '';
-  }
-  
-  // Try to detect language from class names if not already detected
-  if (language === 'plaintext') {
-    const classNames = this.className;
-    const languageMatch = classNames.match(/language-(\w+)|lang-(\w+)/);
-    if (languageMatch) {
-      language = languageMatch[1] || languageMatch[2];
-    }
-  }
-  
-  // Save to chrome.storage.local immediately (popup is likely closed)
-  const selectedCode = {
-    code: codeContent.trim(),
-    language: language,
-    source: window.location.href,
-    timestamp: Date.now(),
-  };
-  
-  browser.storage.local.set({ leetvision_selected_code: selectedCode }).then(() => {
-    console.log('LeetVision: Code saved to storage', { length: codeContent.length, language });
-  });
-  
-  // Also send message in case popup is still open
-  browser.runtime.sendMessage({
-    type: 'CODE_SELECTED',
-    code: codeContent.trim(),
-    language: language,
-    source: window.location.href,
-  }).catch(() => {
-    // Popup likely closed, that's fine - we saved to storage
-  });
-  
-  // Hide tooltip after a brief moment
-  setTimeout(() => {
-    hideTooltip();
-  }, 1500);
-  
-  // Automatically disable hover mode after successful selection
-  setTimeout(() => {
-    disableHoverMode();
-  }, 500); // Small delay to show selection feedback
-}
-
-/**
  * Handle ESC key to cancel selection
  */
 function handleEscKey(event: KeyboardEvent) {
   if (event.key === 'Escape' && isHoverModeActive) {
     disableHoverMode();
   }
-}
-
-/**
- * Add event listeners to code elements
- */
-function addEventListeners() {
-  codeElements.forEach(element => {
-    element.addEventListener('mouseenter', handleMouseEnter);
-    element.addEventListener('mouseleave', handleMouseLeave);
-    element.addEventListener('click', handleClick);
-  });
-  
-  document.addEventListener('keydown', handleEscKey);
 }
 
 /**
@@ -419,31 +562,78 @@ export function enableHoverMode() {
   console.log('LeetVision: Enabling hover mode');
   isHoverModeActive = true;
   
-  // Inject styles (if not already injected)
-  injectStyles();
-  
-  // Clear previous selection highlight if re-enabling
-  if (selectedElement) {
-    selectedElement.classList.remove(LEETVISION_SELECTED_CLASS);
-    selectedElement = null;
+  // If there's already a selected code, preserve it but still show other options
+  if (selectedBox && selectedElement) {
+    // Create overlay if it doesn't exist
+    if (!overlayElement) {
+      overlayElement = createOverlay();
+    }
+    
+    // Update the selected box to show "Currently selected" state
+    selectedBox.style.outline = '3px solid #059669';
+    selectedBox.style.background = 'rgba(5, 150, 105, 0.03)';
+    selectedBox.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.15)';
+    selectedBox.style.pointerEvents = 'none'; // Make it non-interactive
+    
+    // Show tooltip
+    showTooltip(selectedBox, 'Currently selected', true);
+    
+    // Add scroll listener to keep it positioned
+    window.addEventListener('scroll', updatePositions, true);
+    
+    // Continue with normal hover mode to show other options
+    // Don't return early - we want to show other code elements too
+  } else {
+    // No existing selection - clean up any previous selection
+    if (selectedBox) {
+      selectedBox.remove();
+      selectedBox = null;
+      selectedElement = null;
+    }
+    
+    // If overlay exists from previous selection, remove it
+    if (overlayElement && overlayElement.parentNode) {
+      overlayElement.remove();
+      overlayElement = null;
+    }
+    
+    // Create fresh overlay
+    overlayElement = createOverlay();
   }
   
   // Find code elements
   codeElements = findCodeElements();
   console.log(`LeetVision: Found ${codeElements.length} code elements`);
   
-  // Immediately highlight all code elements
+  // Create highlight boxes for each code element (excluding already selected)
+  highlightBoxes.clear();
   codeElements.forEach(element => {
-    element.classList.add(LEETVISION_HOVER_CLASS);
+    // Skip if this is the already selected element
+    if (element === selectedElement) {
+      return;
+    }
+    
+    const box = createHighlightBox(element);
+    highlightBoxes.set(element, box);
+    overlayElement!.appendChild(box);
   });
   
-  // Add event listeners
-  addEventListeners();
+  // Create debounced resize handler (only resize is debounced)
+  updatePositionsOnResize = debounce(updatePositions, 100);
+  
+  // Add scroll and resize listeners
+  // Scroll updates immediately for smooth tracking, resize is debounced
+  window.addEventListener('scroll', updatePositions, true); // Capture phase, immediate
+  window.addEventListener('resize', updatePositionsOnResize);
+  
+  // Add ESC key listener
+  document.addEventListener('keydown', handleEscKey);
   
   // Send confirmation
   browser.runtime.sendMessage({
     type: 'HOVER_MODE_ENABLED',
     codeElementsFound: codeElements.length,
+    hasExistingSelection: !!(selectedBox && selectedElement),
   }).catch(() => {
     // Popup might be closed, ignore error
   });
@@ -458,27 +648,62 @@ export function disableHoverMode() {
   console.log('LeetVision: Disabling hover mode');
   isHoverModeActive = false;
   
-  // Remove event listeners but preserve selection
-  codeElements.forEach(element => {
-    element.removeEventListener('mouseenter', handleMouseEnter);
-    element.removeEventListener('mouseleave', handleMouseLeave);
-    element.removeEventListener('click', handleClick);
-    // Remove hover class from non-selected elements
-    if (element !== selectedElement) {
-      element.classList.remove(LEETVISION_HOVER_CLASS);
-      element.classList.remove('leetvision-code-active-hover');
-    }
-  });
-  
+  // Remove ESC key listener
   document.removeEventListener('keydown', handleEscKey);
   
-  // Hide and clean up tooltip
+  // Hide tooltip
   hideTooltip();
   
-  // Keep styles injected so selection remains visible
-  // Keep selectedElement reference for persistence
+  // If code was selected, keep only the selected box visible
+  if (selectedBox && overlayElement) {
+    // Remove all boxes except selected
+    highlightBoxes.forEach((box) => {
+      if (box !== selectedBox) {
+        box.removeEventListener('mouseenter', handleBoxMouseEnter);
+        box.removeEventListener('mouseleave', handleBoxMouseLeave);
+        box.removeEventListener('click', handleBoxClick);
+        box.remove();
+      }
+    });
+    
+    // Keep selected box but make it non-interactive
+    selectedBox.style.pointerEvents = 'none';
+    
+    // Keep scroll listener active to track selected box position
+    // Scroll listener stays active, resize listener removed
+    if (updatePositionsOnResize) {
+      window.removeEventListener('resize', updatePositionsOnResize);
+      updatePositionsOnResize = null;
+    }
+    
+    // DON'T remove the overlay - keep it for the selected highlight
+    console.log('LeetVision: Keeping selected highlight visible');
+  } else {
+    // No selection, remove all listeners
+    window.removeEventListener('scroll', updatePositions, true);
+    if (updatePositionsOnResize) {
+      window.removeEventListener('resize', updatePositionsOnResize);
+      updatePositionsOnResize = null;
+    }
+    
+    // Remove overlay completely only if no selection
+    if (overlayElement) {
+      overlayElement.remove();
+      overlayElement = null;
+    }
+  }
   
-  // Clear arrays
+  // Clear highlight boxes map (except selected)
+  if (selectedBox && selectedElement) {
+    const tempBox = selectedBox;
+    const tempElement = selectedElement;
+    highlightBoxes.clear();
+    highlightBoxes.set(tempElement, tempBox);
+  } else {
+    highlightBoxes.clear();
+  }
+  
+  // Clear code elements array
   codeElements = [];
   
   // Send confirmation
@@ -495,5 +720,3 @@ export function disableHoverMode() {
 export function isHoverActive(): boolean {
   return isHoverModeActive;
 }
-
-

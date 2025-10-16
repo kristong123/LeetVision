@@ -12,6 +12,12 @@ const CodeSelector = () => {
   const [showCodePreview, setShowCodePreview] = useState(false);
 
   const toggleHoverMode = async () => {
+    // Guard clause: prevent execution if already active
+    if (hoverModeActive) {
+      console.log('Hover mode already active, ignoring click');
+      return;
+    }
+    
     try {
       const [tab] = await browser.tabs.query({
         active: true,
@@ -127,10 +133,10 @@ const CodeSelector = () => {
     <div className="px-4 py-3">
       <button
         onClick={toggleHoverMode}
-        disabled={isLoading}
+        disabled={isLoading || hoverModeActive}
         className={`w-full py-2 px-4 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           hoverModeActive
-            ? 'bg-green-600 text-white hover:bg-green-700'
+            ? 'bg-green-600 text-white'
             : 'bg-gray-800 dark:bg-gray-600 text-white hover:bg-gray-700 dark:hover:bg-gray-500'
         }`}
       >

@@ -22,6 +22,15 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
+    // Always cancel hover mode when popup opens
+    browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (tab?.id) {
+        browser.tabs.sendMessage(tab.id, { type: 'DISABLE_HOVER_MODE' }).catch(() => {
+          // Content script might not be ready, ignore
+        });
+      }
+    });
+    
     // Load selected code first, then restore other state
     browser.storage.local.get('leetvision_selected_code').then((result) => {
       const selectedCode: any = result.leetvision_selected_code;

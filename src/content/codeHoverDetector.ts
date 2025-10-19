@@ -153,12 +153,21 @@ function clipToViewport(rect: DOMRect): DOMRect {
     return new DOMRect(0, 0, 0, 0);
   }
   
-  return new DOMRect(
+  const clippedRect = new DOMRect(
     left,
     top,
     right - left,
     bottom - top
   );
+  
+  // Additional validation: if the clipped rect is still unreasonably large,
+  // it might be a full-page element that should be excluded
+  if (clippedRect.width > viewportWidth * 0.9 || clippedRect.height > viewportHeight * 0.9) {
+    // This is likely a full-page element, return a minimal rect to exclude it
+    return new DOMRect(0, 0, 0, 0);
+  }
+  
+  return clippedRect;
 }
 
 /**
@@ -170,39 +179,63 @@ function getCodeElementRect(element: HTMLElement): DOMRect {
   
   // For Monaco editor, try to find the scrollable content area
   if (element.classList.contains('monaco-editor')) {
-    // Try overflow-guard first (this is the visible viewport container)
+    // Strategy 1: Try overflow-guard first (this is the visible viewport container)
     const overflowGuard = element.querySelector('.overflow-guard');
     if (overflowGuard) {
       rect = overflowGuard.getBoundingClientRect();
-      return clipToViewport(rect);
+      // Additional check: ensure it's actually visible and reasonable size
+      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
+        return clipToViewport(rect);
+      }
     }
     
-    // Try the editor's parent container with explicit dimensions
-    const parent = element.parentElement;
-    if (parent && parent.offsetHeight > 0 && parent.offsetWidth > 0) {
-      rect = parent.getBoundingClientRect();
-      return clipToViewport(rect);
-    }
-    
-    // Try view-lines (actual code lines)
-    const viewLines = element.querySelector('.view-lines');
-    if (viewLines) {
-      rect = viewLines.getBoundingClientRect();
-      return clipToViewport(rect);
-    }
-    
-    // Try lines-content as fallback
-    const linesContent = element.querySelector('.lines-content');
-    if (linesContent) {
-      rect = linesContent.getBoundingClientRect();
-      return clipToViewport(rect);
-    }
-    
-    // Try scrollable-element as last resort
+    // Strategy 2: Try to find the editor's visible container by checking scrollable elements
     const scrollableElement = element.querySelector('.monaco-scrollable-element');
     if (scrollableElement) {
       rect = scrollableElement.getBoundingClientRect();
-      return clipToViewport(rect);
+      // Check if this element is actually visible and reasonable
+      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
+        return clipToViewport(rect);
+      }
+    }
+    
+    // Strategy 3: Try view-lines (actual code lines) but with size validation
+    const viewLines = element.querySelector('.view-lines');
+    if (viewLines) {
+      rect = viewLines.getBoundingClientRect();
+      // Only use if it's a reasonable size (not the entire document)
+      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
+        return clipToViewport(rect);
+      }
+    }
+    
+    // Strategy 4: Try lines-content as fallback
+    const linesContent = element.querySelector('.lines-content');
+    if (linesContent) {
+      rect = linesContent.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
+        return clipToViewport(rect);
+      }
+    }
+    
+    // Strategy 5: Try the editor's parent container but validate it's reasonable
+    const parent = element.parentElement;
+    if (parent && parent.offsetHeight > 0 && parent.offsetWidth > 0) {
+      rect = parent.getBoundingClientRect();
+      // Only use parent if it's not too large (likely the full editor container)
+      if (rect.width < window.innerWidth * 1.5 && rect.height < window.innerHeight * 1.5) {
+        return clipToViewport(rect);
+      }
+    }
+    
+    // Strategy 6: For Monaco editors, try to find the actual visible editor area
+    // Look for elements with specific Monaco classes that represent the viewport
+    const viewportElements = element.querySelectorAll('.monaco-editor .view-overlay, .monaco-editor .view-lines, .monaco-editor .margin');
+    for (const viewportEl of viewportElements) {
+      rect = viewportEl.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
+        return clipToViewport(rect);
+      }
     }
   }
   
@@ -226,6 +259,20 @@ function getCodeElementRect(element: HTMLElement): DOMRect {
 function createHighlightBox(element: HTMLElement): HTMLDivElement {
   const rect = getCodeElementRect(element);
   const box = document.createElement('div');
+  
+  // Skip creating box if rect is invalid (0x0)
+  if (rect.width === 0 || rect.height === 0) {
+    // Return a hidden box that won't be visible
+    box.style.cssText = `
+      position: absolute;
+      left: 0px;
+      top: 0px;
+      width: 0px;
+      height: 0px;
+      display: none;
+    `;
+    return box;
+  }
   
   box.style.cssText = `
     position: absolute;
@@ -259,6 +306,15 @@ function updatePositions() {
   // Update all highlight boxes
   highlightBoxes.forEach((box, element) => {
     const rect = getCodeElementRect(element);
+    
+    // Hide box if rect is invalid
+    if (rect.width === 0 || rect.height === 0) {
+      box.style.display = 'none';
+      return;
+    }
+    
+    // Show and position box
+    box.style.display = 'block';
     box.style.left = `${rect.left}px`;
     box.style.top = `${rect.top}px`;
     box.style.width = `${rect.width}px`;
@@ -268,6 +324,15 @@ function updatePositions() {
   // Also update the selected box if it exists
   if (selectedBox && selectedElement) {
     const rect = getCodeElementRect(selectedElement);
+    
+    // Hide selected box if rect is invalid
+    if (rect.width === 0 || rect.height === 0) {
+      selectedBox.style.display = 'none';
+      return;
+    }
+    
+    // Show and position selected box
+    selectedBox.style.display = 'block';
     selectedBox.style.left = `${rect.left}px`;
     selectedBox.style.top = `${rect.top}px`;
     selectedBox.style.width = `${rect.width}px`;
@@ -385,7 +450,9 @@ function handleBoxClick(this: HTMLDivElement, event: MouseEvent) {
   
   // Try to detect language from class names if not already detected
   if (language === 'plaintext') {
-    const classNames = element.className;
+    const classNames = typeof element.className === 'string' 
+      ? element.className 
+      : String(element.className || '');
     const languageMatch = classNames.match(/language-(\w+)|lang-(\w+)/);
     if (languageMatch) {
       language = languageMatch[1] || languageMatch[2];
@@ -429,7 +496,12 @@ function handleBoxClick(this: HTMLDivElement, event: MouseEvent) {
  * Check if element should be excluded from code detection
  */
 function shouldExcludeElement(element: HTMLElement): boolean {
-  const classList = element.className.toLowerCase();
+  // Safely get className as string
+  const className = typeof element.className === 'string' 
+    ? element.className 
+    : String(element.className || '');
+  const classList = className.toLowerCase();
+  
   const excludePatterns = [
     'console',
     'output',

@@ -34,9 +34,12 @@ const detectFromTags = (): CodeSection[] => {
 const detectFromEditors = (): CodeSection[] => {
   const sections: CodeSection[] = [];
 
-  // LeetCode editor
+  // LeetCode editor - improved selectors
   const leetcodeEditor = document.querySelector('.monaco-editor') ||
-    document.querySelector('[data-cy="code-editor"]');
+    document.querySelector('[data-cy="code-editor"]') ||
+    document.querySelector('.monaco-editor-container') ||
+    document.querySelector('.editor-container') ||
+    document.querySelector('[class*="leetcode"]');
   if (leetcodeEditor) {
     const content = leetcodeEditor.textContent?.trim();
     if (content) {
@@ -46,6 +49,18 @@ const detectFromEditors = (): CodeSection[] => {
       });
     }
   }
+
+  // GitHub code blocks - improved selectors
+  const githubCodeBlocks = document.querySelectorAll('.blob-code, .blob-code-inner, .highlight, .highlight-source');
+  githubCodeBlocks.forEach((block, index) => {
+    const content = block.textContent?.trim();
+    if (content && content.length > 10) {
+      sections.push({
+        id: `github-code-${index}`,
+        content,
+      });
+    }
+  });
 
   // CodeMirror editors
   const codeMirrorEditors = document.querySelectorAll('.CodeMirror');

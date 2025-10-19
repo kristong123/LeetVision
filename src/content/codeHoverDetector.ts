@@ -9,6 +9,7 @@ let overlayElement: HTMLDivElement | null = null;
 let highlightBoxes: Map<HTMLElement, HTMLDivElement> = new Map();
 let selectedBox: HTMLDivElement | null = null;
 let updatePositionsOnResize: (() => void) | null = null;
+let selectionIndicator: HTMLDivElement | null = null;
 
 /**
  * Create and show tooltip
@@ -71,6 +72,67 @@ function createOverlay(): HTMLDivElement {
   `;
   document.body.appendChild(overlay);
   return overlay;
+}
+
+/**
+ * Create selection indicator
+ */
+function createSelectionIndicator(): HTMLDivElement {
+  const indicator = document.createElement('div');
+  indicator.id = 'leetvision-selection-indicator';
+  indicator.textContent = 'Select code';
+  indicator.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2563eb;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    z-index: 2147483648;
+    pointer-events: auto;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+    user-select: none;
+  `;
+  
+  // Add hover effect
+  indicator.addEventListener('mouseenter', () => {
+    indicator.textContent = 'Cancel';
+    indicator.style.background = '#dc2626';
+    indicator.style.transform = 'translateX(-50%) scale(1.05)';
+  });
+  
+  indicator.addEventListener('mouseleave', () => {
+    indicator.textContent = 'Select code';
+    indicator.style.background = '#2563eb';
+    indicator.style.transform = 'translateX(-50%) scale(1)';
+  });
+  
+  // Add click handler to cancel selection
+  indicator.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    disableHoverMode();
+  });
+  
+  document.body.appendChild(indicator);
+  return indicator;
+}
+
+/**
+ * Remove selection indicator
+ */
+function removeSelectionIndicator() {
+  if (selectionIndicator) {
+    selectionIndicator.remove();
+    selectionIndicator = null;
+  }
 }
 
 /**
@@ -413,6 +475,23 @@ function findCodeElements(): HTMLElement[] {
     '.CodeMirror',
     '.ace_editor',
     '[class*="editor"]',
+    // LeetCode specific selectors
+    '[data-cy="code-editor"]',
+    '.monaco-editor-container',
+    '.editor-container',
+    '[class*="leetcode"]',
+    '[class*="LeetCode"]',
+    // GitHub specific selectors
+    '.blob-code',
+    '.blob-code-inner',
+    '.highlight',
+    '.highlight-source',
+    '[data-tagsearch-lang]',
+    // Additional common patterns
+    '[class*="syntax"]',
+    '[class*="Syntax"]',
+    '[class*="highlight"]',
+    '[class*="Highlight"]',
   ];
 
   const elements = new Set<HTMLElement>();
@@ -503,7 +582,39 @@ function extractMonacoCode(element: HTMLElement): string {
     }
   }
   
-  // Method 4: Extract from view-lines (fallback, may have formatting issues)
+  // Method 4: Try to find Monaco editor through React fiber (LeetCode specific)
+  try {
+    const reactFiber = (element as any)._reactInternalFiber || (element as any)._reactInternalInstance;
+    if (reactFiber) {
+      let current = reactFiber;
+      while (current) {
+        if (current.memoizedProps?.editor?.getValue) {
+          return current.memoizedProps.editor.getValue();
+        }
+        if (current.memoizedState?.editor?.getValue) {
+          return current.memoizedState.editor.getValue();
+        }
+        current = current.child || current.sibling;
+      }
+    }
+  } catch (e) {
+    console.log('LeetVision: Could not access React fiber', e);
+  }
+  
+  // Method 5: Try to find Monaco editor through data attributes
+  const editorId = element.getAttribute('data-editor-id');
+  if (editorId && (window as any).monaco) {
+    try {
+      const editor = (window as any).monaco.editor.getModelById?.(editorId);
+      if (editor?.getValue) {
+        return editor.getValue();
+      }
+    } catch (e) {
+      console.log('LeetVision: Could not access Monaco editor by ID', e);
+    }
+  }
+  
+  // Method 6: Extract from view-lines (fallback, may have formatting issues)
   const viewLines = element.querySelector('.view-lines');
   if (viewLines) {
     const lines: string[] = [];
@@ -511,6 +622,18 @@ function extractMonacoCode(element: HTMLElement): string {
       lines.push(line.textContent || '');
     });
     return lines.join('\n');
+  }
+  
+  // Method 7: Try to extract from lines-content (Monaco internal structure)
+  const linesContent = element.querySelector('.lines-content');
+  if (linesContent) {
+    const lines: string[] = [];
+    linesContent.querySelectorAll('.view-line').forEach((line) => {
+      lines.push(line.textContent || '');
+    });
+    if (lines.length > 0) {
+      return lines.join('\n');
+    }
   }
   
   // Final fallback
@@ -601,6 +724,11 @@ export function enableHoverMode() {
     overlayElement = createOverlay();
   }
   
+  // Create selection indicator
+  if (!selectionIndicator) {
+    selectionIndicator = createSelectionIndicator();
+  }
+  
   // Find code elements
   codeElements = findCodeElements();
   console.log(`LeetVision: Found ${codeElements.length} code elements`);
@@ -653,6 +781,9 @@ export function disableHoverMode() {
   
   // Hide tooltip
   hideTooltip();
+  
+  // Remove selection indicator
+  removeSelectionIndicator();
   
   // If code was selected, keep only the selected box visible
   if (selectedBox && overlayElement) {

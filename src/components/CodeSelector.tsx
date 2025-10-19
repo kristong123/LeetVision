@@ -29,19 +29,59 @@ const CodeSelector = () => {
       }
 
       if (!hoverModeActive) {
-        // Enable hover mode and close popup
-        // Don't await - we're closing the popup immediately
-        browser.tabs.sendMessage(tab.id, {
-          type: 'ENABLE_HOVER_MODE',
-        }).catch((error) => {
-          // Popup will be closed, so just log the error
-          console.error('Error enabling hover mode:', error);
+        // First test if content script is working
+        browser.tabs.sendMessage(tab.id!, {
+          type: 'PING',
+        }).then(() => {
+          console.log('Content script is working, enabling hover mode...');
+          // Content script is working, now enable hover mode
+          return browser.tabs.sendMessage(tab.id!, {
+            type: 'ENABLE_HOVER_MODE',
+          });
+        }).then(() => {
+          console.log('Hover mode enabled successfully');
+          dispatch(setHoverModeActive(true));
+          // Close the popup so user can select code on the page
+          window.close();
+        }).catch(async (error) => {
+          console.error('Error with content script:', error);
+          
+          // If content script doesn't exist, try to inject it
+          if (error.message?.includes('Receiving end does not exist')) {
+            try {
+              console.log('Content script not found, attempting to inject...');
+              await browser.scripting.executeScript({
+                target: { tabId: tab.id! },
+                files: ['assets/contentScript.ts-C0eL4d_4.js']
+              });
+              
+              // Wait a moment for the script to load, then try again
+              setTimeout(async () => {
+                try {
+                  // Test ping first
+                  await browser.tabs.sendMessage(tab.id!, { type: 'PING' });
+                  console.log('Content script injected successfully');
+                  
+                  // Now enable hover mode
+                  await browser.tabs.sendMessage(tab.id!, {
+                    type: 'ENABLE_HOVER_MODE',
+                  });
+                  console.log('Hover mode enabled successfully after injection');
+                  dispatch(setHoverModeActive(true));
+                  window.close();
+                } catch (retryError) {
+                  console.error('Still failed after injection:', retryError);
+                  alert('Failed to enable hover mode. Please refresh the page and try again.');
+                }
+              }, 1000); // Increased timeout to allow script to fully load
+            } catch (injectionError) {
+              console.error('Failed to inject content script:', injectionError);
+              alert('Failed to enable hover mode. Please refresh the page and try again.');
+            }
+          } else {
+            alert('Failed to enable hover mode. Please refresh the page and try again.');
+          }
         });
-        
-        dispatch(setHoverModeActive(true));
-        
-        // Close the popup so user can select code on the page
-        window.close();
       } else {
         // Disable hover mode
         await browser.tabs.sendMessage(tab.id, {

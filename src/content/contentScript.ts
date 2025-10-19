@@ -4,10 +4,24 @@ import { enableHoverMode, disableHoverMode, isHoverActive } from './codeHoverDet
 
 console.log('LeetVision content script loaded');
 
+// Ensure the script is properly initialized
+try {
+  console.log('LeetVision: Content script initialization started');
+} catch (error) {
+  console.error('LeetVision: Content script initialization failed:', error);
+}
+
 // Listen for messages from popup or background script
 browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
+  console.log('LeetVision: Received message:', message.type);
+  
   // Handle all message types synchronously
   try {
+    // Test message to verify content script is working
+    if (message.type === 'PING') {
+      sendResponse({ success: true, message: 'Content script is working' });
+      return true;
+    }
     if (message.type === 'SCAN_CODE') {
       const codeSections = detectCodeSections();
       sendResponse({ success: true, codeSections });

@@ -5,16 +5,13 @@ let isHoverModeActive = false;
 let codeElements: HTMLElement[] = [];
 let selectedElement: HTMLElement | null = null;
 let tooltipElement: HTMLDivElement | null = null;
-let overlayElement: HTMLDivElement | null = null;
-let highlightBoxes: Map<HTMLElement, HTMLDivElement> = new Map();
-let selectedBox: HTMLDivElement | null = null;
-let updatePositionsOnResize: (() => void) | null = null;
 let selectionIndicator: HTMLDivElement | null = null;
+let originalStyles: Map<HTMLElement, string> = new Map();
 
 /**
  * Create and show tooltip
  */
-function showTooltip(box: HTMLDivElement, text: string, isSuccess: boolean = false) {
+function showTooltip(element: HTMLElement, text: string, isSuccess: boolean = false) {
   if (!tooltipElement) {
     tooltipElement = document.createElement('div');
     tooltipElement.id = 'leetvision-tooltip';
@@ -39,7 +36,7 @@ function showTooltip(box: HTMLDivElement, text: string, isSuccess: boolean = fal
   tooltipElement.textContent = text;
   tooltipElement.style.background = isSuccess ? '#059669' : '#2563eb';
   
-  const rect = box.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
   tooltipElement.style.left = `${rect.left + rect.width / 2}px`;
   tooltipElement.style.top = `${rect.top - 10}px`;
   tooltipElement.style.transform = 'translate(-50%, -100%)';
@@ -56,22 +53,99 @@ function hideTooltip() {
 }
 
 /**
- * Create overlay element
+ * Apply highlight styles directly to code element
  */
-function createOverlay(): HTMLDivElement {
-  const overlay = document.createElement('div');
-  overlay.id = 'leetvision-overlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    pointer-events: none;
-    z-index: 2147483647;
-  `;
-  document.body.appendChild(overlay);
-  return overlay;
+function applyHighlightStyles(element: HTMLElement, isSelected: boolean = false) {
+  // Store original styles if not already stored
+  if (!originalStyles.has(element)) {
+    originalStyles.set(element, element.style.cssText);
+  }
+  
+  const color = isSelected ? '#059669' : '#2563eb';
+  const bgColor = isSelected ? 'rgba(5, 150, 105, 0.03)' : 'rgba(37, 99, 235, 0.03)';
+  const shadowColor = isSelected ? 'rgba(5, 150, 105, 0.15)' : 'rgba(37, 99, 235, 0.15)';
+  
+  // For Monaco editors, apply styles only to the Monaco container
+  if (element.classList.contains('monaco-editor') || element.querySelector('.monaco-editor')) {
+    const monacoContainer = element.classList.contains('monaco-editor') 
+      ? element 
+      : element.querySelector('.monaco-editor') as HTMLElement;
+    
+    if (monacoContainer) {
+      // Store original styles for Monaco container
+      if (!originalStyles.has(monacoContainer)) {
+        originalStyles.set(monacoContainer, monacoContainer.style.cssText);
+      }
+      
+      // Apply styles only to Monaco container
+      monacoContainer.style.cssText += `
+        outline: 4px solid ${color} !important;
+        outline-offset: 2px !important;
+        background: ${bgColor} !important;
+        box-shadow: 0 0 0 6px ${shadowColor}, inset 0 0 0 2px ${color} !important;
+        transition: outline 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+        cursor: pointer !important;
+        position: relative !important;
+        z-index: 999999 !important;
+      `;
+    }
+  } else {
+    // For non-Monaco elements, apply styles normally
+    element.style.cssText += `
+      outline: 4px solid ${color} !important;
+      outline-offset: 2px !important;
+      background: ${bgColor} !important;
+      box-shadow: 0 0 0 6px ${shadowColor}, inset 0 0 0 2px ${color} !important;
+      transition: outline 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+      cursor: pointer !important;
+      position: relative !important;
+      z-index: 999999 !important;
+    `;
+  }
+}
+
+/**
+ * Remove highlight styles from code element
+ */
+function removeHighlightStyles(element: HTMLElement) {
+  // For Monaco editors, clean up Monaco container
+  if (element.classList.contains('monaco-editor') || element.querySelector('.monaco-editor')) {
+    const monacoContainer = element.classList.contains('monaco-editor') 
+      ? element 
+      : element.querySelector('.monaco-editor') as HTMLElement;
+    
+    if (monacoContainer) {
+      const monacoOriginalStyle = originalStyles.get(monacoContainer);
+      if (monacoOriginalStyle !== undefined) {
+        monacoContainer.style.cssText = monacoOriginalStyle;
+        originalStyles.delete(monacoContainer);
+      } else {
+        monacoContainer.style.outline = '';
+        monacoContainer.style.outlineOffset = '';
+        monacoContainer.style.background = '';
+        monacoContainer.style.boxShadow = '';
+        monacoContainer.style.cursor = '';
+        monacoContainer.style.position = '';
+        monacoContainer.style.zIndex = '';
+      }
+    }
+  } else {
+    // For non-Monaco elements, clean up normally
+    const originalStyle = originalStyles.get(element);
+    if (originalStyle !== undefined) {
+      element.style.cssText = originalStyle;
+      originalStyles.delete(element);
+    } else {
+      // Fallback: remove our specific styles
+      element.style.outline = '';
+      element.style.outlineOffset = '';
+      element.style.background = '';
+      element.style.boxShadow = '';
+      element.style.cursor = '';
+      element.style.position = '';
+      element.style.zIndex = '';
+    }
+  }
 }
 
 /**
@@ -136,278 +210,56 @@ function removeSelectionIndicator() {
 }
 
 /**
- * Clip a rect to the viewport bounds
+ * Handle mouse enter on code element
  */
-function clipToViewport(rect: DOMRect): DOMRect {
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  
-  // Calculate clipped bounds
-  const left = Math.max(0, rect.left);
-  const top = Math.max(0, rect.top);
-  const right = Math.min(viewportWidth, rect.right);
-  const bottom = Math.min(viewportHeight, rect.bottom);
-  
-  // If the element is completely off-screen, return a minimal rect
-  if (right <= left || bottom <= top) {
-    return new DOMRect(0, 0, 0, 0);
-  }
-  
-  const clippedRect = new DOMRect(
-    left,
-    top,
-    right - left,
-    bottom - top
-  );
-  
-  // Additional validation: if the clipped rect is still unreasonably large,
-  // it might be a full-page element that should be excluded
-  if (clippedRect.width > viewportWidth * 0.9 || clippedRect.height > viewportHeight * 0.9) {
-    // This is likely a full-page element, return a minimal rect to exclude it
-    return new DOMRect(0, 0, 0, 0);
-  }
-  
-  return clippedRect;
-}
-
-/**
- * Get the best bounding rect for a code element
- * For Monaco editors, target the actual code viewport
- */
-function getCodeElementRect(element: HTMLElement): DOMRect {
-  let rect: DOMRect;
-  
-  // For Monaco editor, try to find the scrollable content area
-  if (element.classList.contains('monaco-editor')) {
-    // Strategy 1: Try overflow-guard first (this is the visible viewport container)
-    const overflowGuard = element.querySelector('.overflow-guard');
-    if (overflowGuard) {
-      rect = overflowGuard.getBoundingClientRect();
-      // Additional check: ensure it's actually visible and reasonable size
-      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
-        return clipToViewport(rect);
-      }
-    }
-    
-    // Strategy 2: Try to find the editor's visible container by checking scrollable elements
-    const scrollableElement = element.querySelector('.monaco-scrollable-element');
-    if (scrollableElement) {
-      rect = scrollableElement.getBoundingClientRect();
-      // Check if this element is actually visible and reasonable
-      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
-        return clipToViewport(rect);
-      }
-    }
-    
-    // Strategy 3: Try view-lines (actual code lines) but with size validation
-    const viewLines = element.querySelector('.view-lines');
-    if (viewLines) {
-      rect = viewLines.getBoundingClientRect();
-      // Only use if it's a reasonable size (not the entire document)
-      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
-        return clipToViewport(rect);
-      }
-    }
-    
-    // Strategy 4: Try lines-content as fallback
-    const linesContent = element.querySelector('.lines-content');
-    if (linesContent) {
-      rect = linesContent.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
-        return clipToViewport(rect);
-      }
-    }
-    
-    // Strategy 5: Try the editor's parent container but validate it's reasonable
-    const parent = element.parentElement;
-    if (parent && parent.offsetHeight > 0 && parent.offsetWidth > 0) {
-      rect = parent.getBoundingClientRect();
-      // Only use parent if it's not too large (likely the full editor container)
-      if (rect.width < window.innerWidth * 1.5 && rect.height < window.innerHeight * 1.5) {
-        return clipToViewport(rect);
-      }
-    }
-    
-    // Strategy 6: For Monaco editors, try to find the actual visible editor area
-    // Look for elements with specific Monaco classes that represent the viewport
-    const viewportElements = element.querySelectorAll('.monaco-editor .view-overlay, .monaco-editor .view-lines, .monaco-editor .margin');
-    for (const viewportEl of viewportElements) {
-      rect = viewportEl.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth && rect.height < window.innerHeight) {
-        return clipToViewport(rect);
-      }
-    }
-  }
-  
-  // For CodeMirror, try to find the actual code area
-  if (element.classList.contains('CodeMirror')) {
-    const lines = element.querySelector('.CodeMirror-lines');
-    if (lines) {
-      rect = lines.getBoundingClientRect();
-      return clipToViewport(rect);
-    }
-  }
-  
-  // Default: use element's own rect, clipped to viewport
-  rect = element.getBoundingClientRect();
-  return clipToViewport(rect);
-}
-
-/**
- * Create highlight box for a code element
- */
-function createHighlightBox(element: HTMLElement): HTMLDivElement {
-  const rect = getCodeElementRect(element);
-  const box = document.createElement('div');
-  
-  // Skip creating box if rect is invalid (0x0)
-  if (rect.width === 0 || rect.height === 0) {
-    // Return a hidden box that won't be visible
-    box.style.cssText = `
-      position: absolute;
-      left: 0px;
-      top: 0px;
-      width: 0px;
-      height: 0px;
-      display: none;
-    `;
-    return box;
-  }
-  
-  box.style.cssText = `
-    position: absolute;
-    left: ${rect.left}px;
-    top: ${rect.top}px;
-    width: ${rect.width}px;
-    height: ${rect.height}px;
-    outline: 3px solid #2563eb;
-    background: rgba(37, 99, 235, 0.03);
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
-    transition: none;
-    pointer-events: auto;
-    cursor: pointer;
-  `;
-  
-  // Store reference to original element
-  (box as any)._codeElement = element;
-  
-  // Add event listeners to box
-  box.addEventListener('mouseenter', handleBoxMouseEnter);
-  box.addEventListener('mouseleave', handleBoxMouseLeave);
-  box.addEventListener('click', handleBoxClick);
-  
-  return box;
-}
-
-/**
- * Update positions of all highlight boxes
- */
-function updatePositions() {
-  // Update all highlight boxes
-  highlightBoxes.forEach((box, element) => {
-    const rect = getCodeElementRect(element);
-    
-    // Hide box if rect is invalid
-    if (rect.width === 0 || rect.height === 0) {
-      box.style.display = 'none';
-      return;
-    }
-    
-    // Show and position box
-    box.style.display = 'block';
-    box.style.left = `${rect.left}px`;
-    box.style.top = `${rect.top}px`;
-    box.style.width = `${rect.width}px`;
-    box.style.height = `${rect.height}px`;
-  });
-  
-  // Also update the selected box if it exists
-  if (selectedBox && selectedElement) {
-    const rect = getCodeElementRect(selectedElement);
-    
-    // Hide selected box if rect is invalid
-    if (rect.width === 0 || rect.height === 0) {
-      selectedBox.style.display = 'none';
-      return;
-    }
-    
-    // Show and position selected box
-    selectedBox.style.display = 'block';
-    selectedBox.style.left = `${rect.left}px`;
-    selectedBox.style.top = `${rect.top}px`;
-    selectedBox.style.width = `${rect.width}px`;
-    selectedBox.style.height = `${rect.height}px`;
-  }
-}
-
-/**
- * Debounce helper
- */
-function debounce(func: () => void, wait: number): () => void {
-  let timeout: NodeJS.Timeout;
-  return function executedFunction() {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(), wait);
-  };
-}
-
-/**
- * Handle mouse enter on highlight box
- */
-function handleBoxMouseEnter(this: HTMLDivElement) {
+function handleElementMouseEnter(this: HTMLElement) {
   if (!isHoverModeActive) return;
-  if (this === selectedBox) return;
+  if (this === selectedElement) return;
   
-  // Active hover style
-  this.style.outline = '4px solid #2563eb';
-  this.style.background = 'rgba(37, 99, 235, 0.05)';
-  this.style.boxShadow = '0 0 0 6px rgba(37, 99, 235, 0.25)';
-  
+  // Apply hover styles
+  applyHighlightStyles(this, false);
   showTooltip(this, 'Click to select this code');
 }
 
 /**
- * Handle mouse leave on highlight box
+ * Handle mouse leave on code element
  */
-function handleBoxMouseLeave(this: HTMLDivElement) {
-  if (this === selectedBox) return;
+function handleElementMouseLeave(this: HTMLElement) {
+  if (this === selectedElement) return;
   
-  // Reset to default hover style
-  this.style.outline = '3px solid #2563eb';
-  this.style.background = 'rgba(37, 99, 235, 0.03)';
-  this.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.15)';
-  
+  // Don't remove highlight styles - keep them visible
+  // Just hide the tooltip
   hideTooltip();
 }
 
 /**
- * Handle click on highlight box
+ * Handle click on code element
  */
-function handleBoxClick(this: HTMLDivElement, event: MouseEvent) {
+function handleElementClick(this: HTMLElement, event: MouseEvent) {
   if (!isHoverModeActive) return;
   
   event.preventDefault();
   event.stopPropagation();
   
-  // Get the original code element
-  const element = (this as any)._codeElement as HTMLElement;
-  if (!element) return;
-  
-  // Remove previous selection completely
-  if (selectedBox) {
-    selectedBox.remove();
-    selectedBox = null;
+  // Remove previous selection
+  if (selectedElement) {
+    removeHighlightStyles(selectedElement);
     selectedElement = null;
   }
   
   // Mark as selected
-  selectedElement = element;
-  selectedBox = this;
+  selectedElement = this;
   
   // Apply selected styling
-  this.style.outline = '3px solid #059669';
-  this.style.background = 'rgba(5, 150, 105, 0.03)';
-  this.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.15)';
+  applyHighlightStyles(this, true);
+  
+  // Auto-hide green highlight after 1 second
+  setTimeout(() => {
+    if (selectedElement === this) {
+      removeHighlightStyles(this);
+      console.log('LeetVision: Auto-hiding selected element after 1 second');
+    }
+  }, 1000);
   
   // Show success tooltip
   showTooltip(this, '✓ Code selected!', true);
@@ -416,43 +268,43 @@ function handleBoxClick(this: HTMLDivElement, event: MouseEvent) {
   let codeContent = '';
   let language = 'plaintext';
   
-  if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+  if (this.tagName === 'TEXTAREA' || this.tagName === 'INPUT') {
     // Get value from input/textarea
-    const inputElement = element as HTMLInputElement | HTMLTextAreaElement;
+    const inputElement = this as HTMLInputElement | HTMLTextAreaElement;
     codeContent = inputElement.value;
-  } else if (element.classList.contains('monaco-editor') || element.querySelector('.monaco-editor')) {
+  } else if (this.classList.contains('monaco-editor') || this.querySelector('.monaco-editor')) {
     // Monaco editor - use specialized extraction
-    const monacoEl = element.classList.contains('monaco-editor') ? element : element.querySelector('.monaco-editor') as HTMLElement;
+    const monacoEl = this.classList.contains('monaco-editor') ? this : this.querySelector('.monaco-editor') as HTMLElement;
     if (monacoEl) {
       codeContent = extractMonacoCode(monacoEl);
       language = detectMonacoLanguage(monacoEl);
     }
-  } else if (element.classList.contains('CodeMirror')) {
+  } else if (this.classList.contains('CodeMirror')) {
     // CodeMirror editor
-    const cmElement = element as any;
+    const cmElement = this as any;
     if (cmElement.CodeMirror && cmElement.CodeMirror.getValue) {
       codeContent = cmElement.CodeMirror.getValue();
     } else {
-      codeContent = element.textContent || '';
+      codeContent = this.textContent || '';
     }
-  } else if (element.classList.contains('ace_editor')) {
+  } else if (this.classList.contains('ace_editor')) {
     // ACE editor
-    const aceElement = element as any;
+    const aceElement = this as any;
     if (aceElement.env && aceElement.env.editor && aceElement.env.editor.getValue) {
       codeContent = aceElement.env.editor.getValue();
     } else {
-      codeContent = element.textContent || '';
+      codeContent = this.textContent || '';
     }
   } else {
     // Regular code block
-    codeContent = element.textContent || '';
+    codeContent = this.textContent || '';
   }
   
   // Try to detect language from class names if not already detected
   if (language === 'plaintext') {
-    const classNames = typeof element.className === 'string' 
-      ? element.className 
-      : String(element.className || '');
+    const classNames = typeof this.className === 'string' 
+      ? this.className 
+      : String(this.className || '');
     const languageMatch = classNames.match(/language-(\w+)|lang-(\w+)/);
     if (languageMatch) {
       language = languageMatch[1] || languageMatch[2];
@@ -535,8 +387,8 @@ function shouldExcludeElement(element: HTMLElement): boolean {
  */
 function findCodeElements(): HTMLElement[] {
   const codeSelectors = [
-    'pre code',
-    'code',
+    'pre code',  // More specific: only code inside pre
+    'code:not(pre code)',  // Code elements that are NOT inside pre
     '.code',
     '[class*="code"]',
     '[class*="Code"]',
@@ -553,6 +405,14 @@ function findCodeElements(): HTMLElement[] {
     '.editor-container',
     '[class*="leetcode"]',
     '[class*="LeetCode"]',
+    // NeetCode specific selectors
+    '[class*="neetcode"]',
+    '[class*="NeetCode"]',
+    // Monaco editor specific selectors (more comprehensive)
+    '.monaco-editor .view-lines',
+    '.monaco-editor .overflow-guard',
+    '.monaco-editor .monaco-scrollable-element',
+    '[class*="monaco"]',
     // GitHub specific selectors
     '.blob-code',
     '.blob-code-inner',
@@ -585,10 +445,26 @@ function findCodeElements(): HTMLElement[] {
           elements.add(element);
         }
       }
-      // For code editor containers (Monaco, CodeMirror, etc.)
+      // For Monaco editor elements (more comprehensive detection)
       else if (element.classList.contains('monaco-editor') || 
-               element.classList.contains('CodeMirror') ||
-               element.classList.contains('ace_editor')) {
+               element.classList.contains('overflow-guard') ||
+               element.classList.contains('monaco-scrollable-element') ||
+               element.classList.contains('view-lines') ||
+               element.closest('.monaco-editor')) {
+        // Find the main Monaco editor container
+        const monacoContainer = element.classList.contains('monaco-editor') 
+          ? element 
+          : element.closest('.monaco-editor') as HTMLElement;
+        if (monacoContainer) {
+          elements.add(monacoContainer);
+        }
+      }
+      // For CodeMirror editors
+      else if (element.classList.contains('CodeMirror')) {
+        elements.add(element);
+      }
+      // For ACE editors
+      else if (element.classList.contains('ace_editor')) {
         elements.add(element);
       }
       // For regular code blocks
@@ -598,6 +474,51 @@ function findCodeElements(): HTMLElement[] {
     });
   });
 
+  // Additional Monaco editor detection - look for elements with Monaco-related attributes
+  document.querySelectorAll('[data-mode-id], [data-editor-id], [data-uri]').forEach(el => {
+    const element = el as HTMLElement;
+    if (!shouldExcludeElement(element) && element.offsetWidth > 0 && element.offsetHeight > 0) {
+      // Check if this looks like a Monaco editor
+      const className = typeof element.className === 'string' ? element.className : String(element.className || '');
+      const hasMonacoClasses = className.includes('monaco') || 
+                              element.closest('.monaco-editor') ||
+                              element.querySelector('.monaco-editor');
+      if (hasMonacoClasses) {
+        const monacoContainer = element.closest('.monaco-editor') as HTMLElement || element;
+        elements.add(monacoContainer);
+      }
+    }
+  });
+
+  // Aggressive Monaco editor detection - look for any element that might be a code editor
+  // This is a fallback for cases where Monaco isn't detected by the above methods
+  const allDivs = document.querySelectorAll('div');
+  allDivs.forEach(el => {
+    const element = el as HTMLElement;
+    if (!shouldExcludeElement(element) && element.offsetWidth > 200 && element.offsetHeight > 100) {
+      // Check if this div looks like a code editor
+      const className = typeof element.className === 'string' ? element.className : String(element.className || '');
+      const classNameLower = className.toLowerCase();
+      const hasEditorIndicators = classNameLower.includes('editor') || 
+                                 classNameLower.includes('code') ||
+                                 classNameLower.includes('monaco') ||
+                                 element.querySelector('.monaco-editor') ||
+                                 element.querySelector('.CodeMirror') ||
+                                 element.querySelector('.ace_editor') ||
+                                 element.querySelector('[data-mode-id]') ||
+                                 element.querySelector('[data-editor-id]');
+      
+      if (hasEditorIndicators) {
+        // Find the actual editor container
+        const editorContainer = element.querySelector('.monaco-editor') as HTMLElement ||
+                               element.querySelector('.CodeMirror') as HTMLElement ||
+                               element.querySelector('.ace_editor') as HTMLElement ||
+                               element;
+        elements.add(editorContainer);
+      }
+    }
+  });
+
   // Filter out parent elements if their children are already in the set
   // This prevents double-highlighting of both parent and child elements
   const filteredElements = Array.from(elements).filter(element => {
@@ -605,7 +526,9 @@ function findCodeElements(): HTMLElement[] {
     const hasChildInSet = Array.from(elements).some(otherElement => {
       return otherElement !== element && element.contains(otherElement);
     });
-    // Only keep this element if it doesn't have a child in the set
+    
+    // Only filter out if this element has a child in the set (prefer children over parents)
+    // Don't filter out if this element is a child of another - let the parent filtering handle that
     return !hasChildInSet;
   });
 
@@ -758,42 +681,16 @@ export function enableHoverMode() {
   isHoverModeActive = true;
   
   // If there's already a selected code, preserve it but still show other options
-  if (selectedBox && selectedElement) {
-    // Create overlay if it doesn't exist
-    if (!overlayElement) {
-      overlayElement = createOverlay();
-    }
-    
-    // Update the selected box to show "Currently selected" state
-    selectedBox.style.outline = '3px solid #059669';
-    selectedBox.style.background = 'rgba(5, 150, 105, 0.03)';
-    selectedBox.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.15)';
-    selectedBox.style.pointerEvents = 'none'; // Make it non-interactive
-    
-    // Show tooltip
-    showTooltip(selectedBox, 'Currently selected', true);
-    
-    // Add scroll listener to keep it positioned
-    window.addEventListener('scroll', updatePositions, true);
+  if (selectedElement) {
+    // Update the selected element to show "Currently selected" state
+    applyHighlightStyles(selectedElement, true);
+    showTooltip(selectedElement, 'Currently selected', true);
     
     // Continue with normal hover mode to show other options
     // Don't return early - we want to show other code elements too
   } else {
     // No existing selection - clean up any previous selection
-    if (selectedBox) {
-      selectedBox.remove();
-      selectedBox = null;
-      selectedElement = null;
-    }
-    
-    // If overlay exists from previous selection, remove it
-    if (overlayElement && overlayElement.parentNode) {
-      overlayElement.remove();
-      overlayElement = null;
-    }
-    
-    // Create fresh overlay
-    overlayElement = createOverlay();
+    selectedElement = null;
   }
   
   // Create selection indicator
@@ -805,26 +702,27 @@ export function enableHoverMode() {
   codeElements = findCodeElements();
   console.log(`LeetVision: Found ${codeElements.length} code elements`);
   
-  // Create highlight boxes for each code element (excluding already selected)
-  highlightBoxes.clear();
+  // If there's already a selected element, show it with green highlight
+  if (selectedElement) {
+    applyHighlightStyles(selectedElement, true);
+    console.log('LeetVision: Showing previously selected element');
+  }
+  
+  // Apply highlight styles and add event listeners to each code element (excluding already selected)
   codeElements.forEach(element => {
     // Skip if this is the already selected element
     if (element === selectedElement) {
       return;
     }
     
-    const box = createHighlightBox(element);
-    highlightBoxes.set(element, box);
-    overlayElement!.appendChild(box);
+    // Apply highlight styles
+    applyHighlightStyles(element, false);
+    
+    // Add event listeners
+    element.addEventListener('mouseenter', handleElementMouseEnter);
+    element.addEventListener('mouseleave', handleElementMouseLeave);
+    element.addEventListener('click', handleElementClick);
   });
-  
-  // Create debounced resize handler (only resize is debounced)
-  updatePositionsOnResize = debounce(updatePositions, 100);
-  
-  // Add scroll and resize listeners
-  // Scroll updates immediately for smooth tracking, resize is debounced
-  window.addEventListener('scroll', updatePositions, true); // Capture phase, immediate
-  window.addEventListener('resize', updatePositionsOnResize);
   
   // Add ESC key listener
   document.addEventListener('keydown', handleEscKey);
@@ -833,7 +731,7 @@ export function enableHoverMode() {
   browser.runtime.sendMessage({
     type: 'HOVER_MODE_ENABLED',
     codeElementsFound: codeElements.length,
-    hasExistingSelection: !!(selectedBox && selectedElement),
+    hasExistingSelection: !!selectedElement,
   }).catch(() => {
     // Popup might be closed, ignore error
   });
@@ -857,54 +755,16 @@ export function disableHoverMode() {
   // Remove selection indicator
   removeSelectionIndicator();
   
-  // If code was selected, keep only the selected box visible
-  if (selectedBox && overlayElement) {
-    // Remove all boxes except selected
-    highlightBoxes.forEach((box) => {
-      if (box !== selectedBox) {
-        box.removeEventListener('mouseenter', handleBoxMouseEnter);
-        box.removeEventListener('mouseleave', handleBoxMouseLeave);
-        box.removeEventListener('click', handleBoxClick);
-        box.remove();
-      }
-    });
-    
-    // Keep selected box but make it non-interactive
-    selectedBox.style.pointerEvents = 'none';
-    
-    // Keep scroll listener active to track selected box position
-    // Scroll listener stays active, resize listener removed
-    if (updatePositionsOnResize) {
-      window.removeEventListener('resize', updatePositionsOnResize);
-      updatePositionsOnResize = null;
-    }
-    
-    // DON'T remove the overlay - keep it for the selected highlight
-    console.log('LeetVision: Keeping selected highlight visible');
-  } else {
-    // No selection, remove all listeners
-    window.removeEventListener('scroll', updatePositions, true);
-    if (updatePositionsOnResize) {
-      window.removeEventListener('resize', updatePositionsOnResize);
-      updatePositionsOnResize = null;
-    }
-    
-    // Remove overlay completely only if no selection
-    if (overlayElement) {
-      overlayElement.remove();
-      overlayElement = null;
-    }
-  }
+  // Remove all listeners and styles when disabling hover mode
+  codeElements.forEach(element => {
+    element.removeEventListener('mouseenter', handleElementMouseEnter);
+    element.removeEventListener('mouseleave', handleElementMouseLeave);
+    element.removeEventListener('click', handleElementClick);
+    removeHighlightStyles(element);
+  });
   
-  // Clear highlight boxes map (except selected)
-  if (selectedBox && selectedElement) {
-    const tempBox = selectedBox;
-    const tempElement = selectedElement;
-    highlightBoxes.clear();
-    highlightBoxes.set(tempElement, tempBox);
-  } else {
-    highlightBoxes.clear();
-  }
+  // Don't hide selected element here - it will be handled by show/hide messages
+  // The selected element should remain visible when popup is open
   
   // Clear code elements array
   codeElements = [];
@@ -915,6 +775,37 @@ export function disableHoverMode() {
   }).catch(() => {
     // Popup might be closed, ignore error
   });
+}
+
+/**
+ * Clear selected element and its highlight
+ */
+export function clearSelectedElement() {
+  if (selectedElement) {
+    removeHighlightStyles(selectedElement);
+    selectedElement = null;
+    console.log('LeetVision: Cleared selected element');
+  }
+}
+
+/**
+ * Show selected element highlight (when popup is open)
+ */
+export function showSelectedElement() {
+  if (selectedElement) {
+    applyHighlightStyles(selectedElement, true);
+    console.log('LeetVision: Showing selected element');
+  }
+}
+
+/**
+ * Hide selected element highlight (when popup is closed)
+ */
+export function hideSelectedElement() {
+  if (selectedElement) {
+    removeHighlightStyles(selectedElement);
+    console.log('LeetVision: Hiding selected element');
+  }
 }
 
 /**

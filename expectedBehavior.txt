@@ -1,0 +1,68 @@
+x means the piece of code is selected with a green highlight and outline.
+o means the piece of code is an option for selection with a blue highlight and outline.
+
+Expected use case:
+
+code block 1
+code block 2
+code block 3
+
+User opens the extension and clicks select code on page
+
+code block 1 o
+code block 2 o
+code block 3 o
+
+User clicks on code block 1
+
+code block 1 x
+code block 2
+code block 3
+
+There should be a selected indicator that lasts for one second on the selected code block before hiding
+
+code block 1
+code block 2
+code block 3
+
+user opens extension
+
+code block 1 x
+code block 2
+code block 3
+
+user closes extension by clicking outside of the screen or clicking the extension
+
+code block 1
+code block 2
+code block 3
+
+user opens extension
+
+code block 1 x
+code block 2
+code block 3
+
+user clicks select code on page
+
+code block 1 x
+code block 2 o
+code block 3 o
+
+user selects code block 2
+
+code block 1 
+code block 2 x
+code block 3
+
+after 1 second
+
+code block 1 
+code block 2
+code block 3
+
+User opens extension
+
+code block 1 
+code block 2 x
+code block 3

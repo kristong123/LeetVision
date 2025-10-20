@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import { detectCodeSections, hashCode } from '../utils/codeDetection';
-import { enableHoverMode, disableHoverMode, isHoverActive } from './codeHoverDetector';
+import { enableHoverMode, disableHoverMode, isHoverActive, clearSelectedElement, showSelectedElement, hideSelectedElement } from './codeHoverDetector';
 
 console.log('LeetVision content script loaded');
 
@@ -19,6 +19,10 @@ browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
   try {
     // Test message to verify content script is working
     if (message.type === 'PING') {
+      // Update popup check time for monitoring
+      if (typeof (window as any).leetvisionUpdatePopupCheck === 'function') {
+        (window as any).leetvisionUpdatePopupCheck();
+      }
       sendResponse({ success: true, message: 'Content script is working' });
       return true;
     }
@@ -33,6 +37,15 @@ browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
       sendResponse({ success: true });
     } else if (message.type === 'CHECK_HOVER_MODE') {
       sendResponse({ isActive: isHoverActive() });
+    } else if (message.type === 'CLEAR_SELECTED_ELEMENT') {
+      clearSelectedElement();
+      sendResponse({ success: true });
+    } else if (message.type === 'SHOW_SELECTED_ELEMENT') {
+      showSelectedElement();
+      sendResponse({ success: true });
+    } else if (message.type === 'HIDE_SELECTED_ELEMENT') {
+      hideSelectedElement();
+      sendResponse({ success: true });
     } else if (message.type === 'GET_CODE_HASH') {
       const codeSections = detectCodeSections();
       if (codeSections.length > 0) {

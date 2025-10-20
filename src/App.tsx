@@ -22,14 +22,24 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
+    // Establish connection with background script for popup closure detection
+    const port = browser.runtime.connect();
+    
     // Always cancel hover mode when popup opens
     browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab?.id) {
         browser.tabs.sendMessage(tab.id, { type: 'DISABLE_HOVER_MODE' }).catch(() => {
           // Content script might not be ready, ignore
         });
+        
+        // Show selected element if any (popup is now open)
+        browser.tabs.sendMessage(tab.id, { type: 'SHOW_SELECTED_ELEMENT' }).catch(() => {
+          // Content script might not be ready, ignore
+        });
       }
     });
+    
+    // No cleanup needed - background script handles popup disconnection
     
     // Load selected code first, then restore other state
     browser.storage.local.get('leetvision_selected_code').then((result) => {

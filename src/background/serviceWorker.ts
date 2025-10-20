@@ -2,6 +2,24 @@ import browser from 'webextension-polyfill';
 
 console.log('LeetVision background service worker loaded');
 
+// Handle popup connection/disconnection for detecting when popup closes
+browser.runtime.onConnect.addListener((port) => {
+  console.log('LeetVision: Popup connected');
+  
+  port.onDisconnect.addListener(() => {
+    console.log('LeetVision: Popup disconnected - hiding selected element');
+    
+    // When popup disconnects, hide the selected element on the current tab
+    browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (tab?.id) {
+        browser.tabs.sendMessage(tab.id, { type: 'HIDE_SELECTED_ELEMENT' }).catch(() => {
+          // Content script might not be ready, ignore
+        });
+      }
+    });
+  });
+});
+
 // Handle messages from content scripts and popup
 browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
   if (message.type === 'CODE_CHANGED') {

@@ -28,7 +28,8 @@ function showTooltip(element: HTMLElement, text: string, isSuccess: boolean = fa
       pointer-events: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       opacity: 0;
-      transition: opacity 0.15s ease;
+      transform: translate(-50%, -100%) scale(0.9);
+      transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     `;
     document.body.appendChild(tooltipElement);
   }
@@ -39,16 +40,31 @@ function showTooltip(element: HTMLElement, text: string, isSuccess: boolean = fa
   const rect = element.getBoundingClientRect();
   tooltipElement.style.left = `${rect.left + rect.width / 2}px`;
   tooltipElement.style.top = `${rect.top - 10}px`;
-  tooltipElement.style.transform = 'translate(-50%, -100%)';
-  tooltipElement.style.opacity = '1';
+  
+  // Trigger transition with a slight delay to ensure smooth animation
+  requestAnimationFrame(() => {
+    if (tooltipElement) {
+      tooltipElement.style.opacity = '1';
+      tooltipElement.style.transform = 'translate(-50%, -100%) scale(1)';
+    }
+  });
 }
 
 /**
- * Hide tooltip
+ * Hide tooltip with smooth transition
  */
 function hideTooltip() {
   if (tooltipElement) {
     tooltipElement.style.opacity = '0';
+    tooltipElement.style.transform = 'translate(-50%, -100%) scale(0.9)';
+    
+    // Remove tooltip after transition completes
+    setTimeout(() => {
+      if (tooltipElement) {
+        tooltipElement.remove();
+        tooltipElement = null;
+      }
+    }, 250); // Match transition duration
   }
 }
 
@@ -83,7 +99,7 @@ function applyHighlightStyles(element: HTMLElement, isSelected: boolean = false)
         outline-offset: 2px !important;
         background: ${bgColor} !important;
         box-shadow: 0 0 0 6px ${shadowColor}, inset 0 0 0 2px ${color} !important;
-        transition: outline 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+        transition: outline 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         cursor: pointer !important;
         position: relative !important;
         z-index: 999999 !important;
@@ -105,7 +121,7 @@ function applyHighlightStyles(element: HTMLElement, isSelected: boolean = false)
 }
 
 /**
- * Remove highlight styles from code element
+   * Remove highlight styles from code element with transition
  */
 function removeHighlightStyles(element: HTMLElement) {
   // For Monaco editors, clean up Monaco container
@@ -115,36 +131,61 @@ function removeHighlightStyles(element: HTMLElement) {
       : element.querySelector('.monaco-editor') as HTMLElement;
     
     if (monacoContainer) {
-      const monacoOriginalStyle = originalStyles.get(monacoContainer);
-      if (monacoOriginalStyle !== undefined) {
-        monacoContainer.style.cssText = monacoOriginalStyle;
-        originalStyles.delete(monacoContainer);
-      } else {
-        monacoContainer.style.outline = '';
-        monacoContainer.style.outlineOffset = '';
-        monacoContainer.style.background = '';
-        monacoContainer.style.boxShadow = '';
-        monacoContainer.style.cursor = '';
-        monacoContainer.style.position = '';
-        monacoContainer.style.zIndex = '';
-      }
+      // First, transition to default values
+      monacoContainer.style.outline = 'none';
+      monacoContainer.style.outlineOffset = '0px';
+      monacoContainer.style.background = 'transparent';
+      monacoContainer.style.boxShadow = 'none';
+      monacoContainer.style.cursor = 'default';
+      monacoContainer.style.position = '';
+      monacoContainer.style.zIndex = '';
+      
+      // After transition completes, restore original styles
+      setTimeout(() => {
+        const monacoOriginalStyle = originalStyles.get(monacoContainer);
+        if (monacoOriginalStyle !== undefined) {
+          monacoContainer.style.cssText = monacoOriginalStyle;
+          originalStyles.delete(monacoContainer);
+        } else {
+          // Fallback: remove our specific styles
+          monacoContainer.style.outline = '';
+          monacoContainer.style.outlineOffset = '';
+          monacoContainer.style.background = '';
+          monacoContainer.style.boxShadow = '';
+          monacoContainer.style.cursor = '';
+          monacoContainer.style.position = '';
+          monacoContainer.style.zIndex = '';
+        }
+      }, 250); // Match the transition duration
     }
   } else {
-    // For non-Monaco elements, clean up normally
-    const originalStyle = originalStyles.get(element);
-    if (originalStyle !== undefined) {
-      element.style.cssText = originalStyle;
-      originalStyles.delete(element);
-    } else {
-      // Fallback: remove our specific styles
-      element.style.outline = '';
-      element.style.outlineOffset = '';
-      element.style.background = '';
-      element.style.boxShadow = '';
-      element.style.cursor = '';
-      element.style.position = '';
-      element.style.zIndex = '';
-    }
+    // For non-Monaco elements, clean up with transition
+    // First, transition to default values
+    element.style.outline = 'none';
+    element.style.outlineOffset = '0px';
+    element.style.background = 'transparent';
+    element.style.boxShadow = 'none';
+    element.style.cursor = 'default';
+    element.style.position = '';
+    element.style.zIndex = '';
+    
+    // After transition completes, restore original styles
+    setTimeout(() => {
+      const originalStyle = originalStyles.get(element);
+      if (originalStyle !== undefined) {
+        element.style.cssText = originalStyle;
+        originalStyles.delete(element);
+      } else {
+        // Fallback: remove our specific styles
+        element.style.outline = '';
+        element.style.outlineOffset = '';
+        element.style.background = '';
+        element.style.boxShadow = '';
+        element.style.cursor = '';
+        element.style.position = '';
+        element.style.zIndex = '';
+      }
+    }, 250); // Match the transition duration
   }
 }
 
@@ -154,12 +195,13 @@ function removeHighlightStyles(element: HTMLElement) {
 function createSelectionIndicator(): HTMLDivElement {
   const indicator = document.createElement('div');
   indicator.id = 'leetvision-selection-indicator';
-  indicator.textContent = 'Select code';
+  
+  // Create the main container
   indicator.style.cssText = `
     position: fixed;
     top: 20px;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(-10px) scale(0.9);
     background: #2563eb;
     color: white;
     padding: 8px 16px;
@@ -171,21 +213,67 @@ function createSelectionIndicator(): HTMLDivElement {
     pointer-events: auto;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   `;
+  
+  // Create text span
+  const textSpan = document.createElement('span');
+  textSpan.textContent = 'Select code';
+  textSpan.id = 'leetvision-indicator-text';
+  
+  // Create X icon SVG
+  const xIcon = document.createElement('div');
+  xIcon.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 6L6 18"/>
+      <path d="M6 6l12 12"/>
+    </svg>
+  `;
+  xIcon.id = 'leetvision-indicator-icon';
+  xIcon.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+  `;
+  
+  // Append elements
+  indicator.appendChild(textSpan);
+  indicator.appendChild(xIcon);
+  
+  // Animate in after creation
+  requestAnimationFrame(() => {
+    indicator.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+    indicator.style.opacity = '1';
+  });
   
   // Add hover effect
   indicator.addEventListener('mouseenter', () => {
-    indicator.textContent = 'Cancel';
+    const textElement = indicator.querySelector('#leetvision-indicator-text') as HTMLElement;
+    const iconElement = indicator.querySelector('#leetvision-indicator-icon') as HTMLElement;
+    
+    if (textElement) textElement.textContent = 'Cancel';
+    if (iconElement) iconElement.style.opacity = '1';
+    
     indicator.style.background = '#dc2626';
-    indicator.style.transform = 'translateX(-50%) scale(1.05)';
+    indicator.style.transform = 'translateX(-50%) translateY(0) scale(1.05)';
   });
   
   indicator.addEventListener('mouseleave', () => {
-    indicator.textContent = 'Select code';
+    const textElement = indicator.querySelector('#leetvision-indicator-text') as HTMLElement;
+    const iconElement = indicator.querySelector('#leetvision-indicator-icon') as HTMLElement;
+    
+    if (textElement) textElement.textContent = 'Select code';
+    if (iconElement) iconElement.style.opacity = '0.7';
+    
     indicator.style.background = '#2563eb';
-    indicator.style.transform = 'translateX(-50%) scale(1)';
+    indicator.style.transform = 'translateX(-50%) translateY(0) scale(1)';
   });
   
   // Add click handler to cancel selection
@@ -200,12 +288,21 @@ function createSelectionIndicator(): HTMLDivElement {
 }
 
 /**
- * Remove selection indicator
+ * Remove selection indicator with smooth exit animation
  */
 function removeSelectionIndicator() {
   if (selectionIndicator) {
-    selectionIndicator.remove();
-    selectionIndicator = null;
+    // Animate out
+    selectionIndicator.style.transform = 'translateX(-50%) translateY(-10px) scale(0.9)';
+    selectionIndicator.style.opacity = '0';
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      if (selectionIndicator) {
+        selectionIndicator.remove();
+        selectionIndicator = null;
+      }
+    }, 300); // Match transition duration
   }
 }
 
@@ -241,19 +338,28 @@ function handleElementClick(this: HTMLElement, event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
   
-  // Remove previous selection
-  if (selectedElement) {
+  // Remove previous selection completely
+  if (selectedElement && selectedElement !== this) {
+    // Remove event listeners from old selection
+    selectedElement.removeEventListener('mouseenter', handleElementMouseEnter);
+    selectedElement.removeEventListener('mouseleave', handleElementMouseLeave);
+    selectedElement.removeEventListener('click', handleElementClick);
+    // Remove highlight from old selection
     removeHighlightStyles(selectedElement);
-    selectedElement = null;
   }
   
-  // Mark as selected
+  // Set new selected element
   selectedElement = this;
   
-  // Apply selected styling
+  // Remove event listeners from this element to make it unclickable
+  this.removeEventListener('mouseenter', handleElementMouseEnter);
+  this.removeEventListener('mouseleave', handleElementMouseLeave);
+  this.removeEventListener('click', handleElementClick);
+  
+  // Apply selected styling to this element
   applyHighlightStyles(this, true);
   
-  // Auto-hide green highlight after 1 second
+  // Auto-hide green highlight after 1 second (but keep selectedElement reference)
   setTimeout(() => {
     if (selectedElement === this) {
       removeHighlightStyles(this);
@@ -680,17 +786,14 @@ export function enableHoverMode() {
   console.log('LeetVision: Enabling hover mode');
   isHoverModeActive = true;
   
-  // If there's already a selected code, preserve it but still show other options
+  // If there's already selected code, preserve it but still show other options
   if (selectedElement) {
-    // Update the selected element to show "Currently selected" state
+    // Update selected element to show "Currently selected" state
     applyHighlightStyles(selectedElement, true);
-    showTooltip(selectedElement, 'Currently selected', true);
+    console.log('LeetVision: Showing previously selected element');
     
     // Continue with normal hover mode to show other options
     // Don't return early - we want to show other code elements too
-  } else {
-    // No existing selection - clean up any previous selection
-    selectedElement = null;
   }
   
   // Create selection indicator
@@ -701,24 +804,26 @@ export function enableHoverMode() {
   // Find code elements
   codeElements = findCodeElements();
   console.log(`LeetVision: Found ${codeElements.length} code elements`);
+  console.log(`LeetVision: Previously selected elements: ${selectedElement ? 1 : 0}`);
   
-  // If there's already a selected element, show it with green highlight
+  // Show previously selected element with green highlight (no event listeners)
   if (selectedElement) {
+    console.log('LeetVision: Applying green highlight to previously selected element');
     applyHighlightStyles(selectedElement, true);
     console.log('LeetVision: Showing previously selected element');
   }
   
   // Apply highlight styles and add event listeners to each code element (excluding already selected)
   codeElements.forEach(element => {
-    // Skip if this is the already selected element
+    // Skip if this element is already selected
     if (element === selectedElement) {
       return;
     }
     
-    // Apply highlight styles
+    // Apply blue highlight styles
     applyHighlightStyles(element, false);
     
-    // Add event listeners
+    // Add event listeners for new selections
     element.addEventListener('mouseenter', handleElementMouseEnter);
     element.addEventListener('mouseleave', handleElementMouseLeave);
     element.addEventListener('click', handleElementClick);
@@ -760,11 +865,15 @@ export function disableHoverMode() {
     element.removeEventListener('mouseenter', handleElementMouseEnter);
     element.removeEventListener('mouseleave', handleElementMouseLeave);
     element.removeEventListener('click', handleElementClick);
-    removeHighlightStyles(element);
+    
+    // Only remove highlight styles if this element is NOT selected
+    if (element !== selectedElement) {
+      removeHighlightStyles(element);
+    }
   });
   
-  // Don't hide selected element here - it will be handled by show/hide messages
-  // The selected element should remain visible when popup is open
+  // Don't hide selected elements here - they will be handled by show/hide messages
+  // The selected elements should remain visible when popup is open
   
   // Clear code elements array
   codeElements = [];
@@ -778,7 +887,7 @@ export function disableHoverMode() {
 }
 
 /**
- * Clear selected element and its highlight
+ * Clear all selected elements and their highlights
  */
 export function clearSelectedElement() {
   if (selectedElement) {
@@ -789,7 +898,7 @@ export function clearSelectedElement() {
 }
 
 /**
- * Show selected element highlight (when popup is open)
+ * Show all selected element highlights (when popup is open)
  */
 export function showSelectedElement() {
   if (selectedElement) {
@@ -799,7 +908,7 @@ export function showSelectedElement() {
 }
 
 /**
- * Hide selected element highlight (when popup is closed)
+ * Hide all selected element highlights (when popup is closed)
  */
 export function hideSelectedElement() {
   if (selectedElement) {

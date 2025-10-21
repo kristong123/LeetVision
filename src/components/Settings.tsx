@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../redux/hooks';
 import { setPreferences } from '../redux/slices/userSlice';
 import { savePreferences, getGeminiApiKey, saveGeminiApiKey } from '../utils/storage';
+import { X, Eye, EyeOff } from 'lucide-react';
 
 interface SettingsProps {
   onClose: () => void;
@@ -50,19 +51,7 @@ const Settings = ({ onClose }: SettingsProps) => {
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -139,7 +128,7 @@ const Settings = ({ onClose }: SettingsProps) => {
                   onClick={() => setShowApiKey(!showApiKey)}
                   className="absolute right-2 top-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
-                  {showApiKey ? '👁️' : '👁️‍🗨️'}
+                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               <button

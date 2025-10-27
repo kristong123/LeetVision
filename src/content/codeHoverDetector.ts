@@ -78,46 +78,23 @@ function applyHighlightStyles(element: HTMLElement, isSelected: boolean = false)
   }
   
   const color = isSelected ? '#059669' : '#2563eb';
-  const bgColor = isSelected ? 'rgba(5, 150, 105, 0.03)' : 'rgba(37, 99, 235, 0.03)';
-  const shadowColor = isSelected ? 'rgba(5, 150, 105, 0.15)' : 'rgba(37, 99, 235, 0.15)';
-  
-  // For Monaco editors, apply styles only to the Monaco container
-  if (element.classList.contains('monaco-editor') || element.querySelector('.monaco-editor')) {
-    const monacoContainer = element.classList.contains('monaco-editor') 
-      ? element 
-      : element.querySelector('.monaco-editor') as HTMLElement;
-    
-    if (monacoContainer) {
-      // Store original styles for Monaco container
-      if (!originalStyles.has(monacoContainer)) {
-        originalStyles.set(monacoContainer, monacoContainer.style.cssText);
-      }
-      
-      // Apply styles only to Monaco container
-      monacoContainer.style.cssText += `
-        outline: 4px solid ${color} !important;
-        outline-offset: 2px !important;
-        background: ${bgColor} !important;
-        box-shadow: 0 0 0 6px ${shadowColor}, inset 0 0 0 2px ${color} !important;
-        transition: outline 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        cursor: pointer !important;
-        position: relative !important;
-        z-index: 999999 !important;
-      `;
-    }
-  } else {
-    // For non-Monaco elements, apply styles normally
-    element.style.cssText += `
-      outline: 4px solid ${color} !important;
-      outline-offset: 2px !important;
-      background: ${bgColor} !important;
-      box-shadow: 0 0 0 6px ${shadowColor}, inset 0 0 0 2px ${color} !important;
-      transition: outline 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
-      cursor: pointer !important;
-      position: relative !important;
-      z-index: 999999 !important;
-    `;
-  }
+  const color80 = isSelected ? 'rgba(5, 150, 105, 0.8)' : 'rgba(37, 99, 235, 0.8)';
+  const color60 = isSelected ? 'rgba(5, 150, 105, 0.6)' : 'rgba(37, 99, 235, 0.6)';
+  const color40 = isSelected ? 'rgba(5, 150, 105, 0.4)' : 'rgba(37, 99, 235, 0.4)';
+  const color20 = isSelected ? 'rgba(5, 150, 105, 0.2)' : 'rgba(37, 99, 235, 0.2)';
+
+  element.style.cssText += `
+    text-shadow: 
+      0 0 0 ${color},
+      -1px -1px 0 ${color80}, 1px -1px 0 ${color80}, -1px 1px 0 ${color80}, 1px 1px 0 ${color80},
+      -2px -2px 2px ${color60}, 2px -2px 2px ${color60}, -2px 2px 2px ${color60}, 2px 2px 2px ${color60},
+      -3px -3px 4px ${color40}, 3px -3px 4px ${color40}, -3px 3px 4px ${color40}, 3px 3px 4px ${color40},
+      -4px -4px 6px ${color20}, 4px -4px 6px ${color20}, -4px 4px 6px ${color20}, 4px 4px 6px ${color20} !important;
+    transition: background 0.2s ease, box-shadow 0.2s ease, text-shadow 0.2s ease !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 999999 !important;
+  `;
 }
 
 /**
@@ -136,6 +113,7 @@ function removeHighlightStyles(element: HTMLElement) {
       monacoContainer.style.outlineOffset = '0px';
       monacoContainer.style.background = 'transparent';
       monacoContainer.style.boxShadow = 'none';
+      monacoContainer.style.textShadow = 'none';
       monacoContainer.style.cursor = 'default';
       monacoContainer.style.position = '';
       monacoContainer.style.zIndex = '';
@@ -152,6 +130,7 @@ function removeHighlightStyles(element: HTMLElement) {
           monacoContainer.style.outlineOffset = '';
           monacoContainer.style.background = '';
           monacoContainer.style.boxShadow = '';
+          monacoContainer.style.textShadow = '';
           monacoContainer.style.cursor = '';
           monacoContainer.style.position = '';
           monacoContainer.style.zIndex = '';
@@ -165,6 +144,7 @@ function removeHighlightStyles(element: HTMLElement) {
     element.style.outlineOffset = '0px';
     element.style.background = 'transparent';
     element.style.boxShadow = 'none';
+    element.style.textShadow = 'none';
     element.style.cursor = 'default';
     element.style.position = '';
     element.style.zIndex = '';
@@ -181,6 +161,7 @@ function removeHighlightStyles(element: HTMLElement) {
         element.style.outlineOffset = '';
         element.style.background = '';
         element.style.boxShadow = '';
+        element.style.textShadow = '';
         element.style.cursor = '';
         element.style.position = '';
         element.style.zIndex = '';

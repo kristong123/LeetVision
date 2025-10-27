@@ -223,7 +223,7 @@ function createSelectionIndicator(): HTMLDivElement {
   
   // Create text span
   const textSpan = document.createElement('span');
-  textSpan.textContent = 'Select code';
+  textSpan.textContent = 'Select';
   textSpan.id = 'leetvision-indicator-text';
   
   // Create X icon SVG
@@ -269,7 +269,7 @@ function createSelectionIndicator(): HTMLDivElement {
     const textElement = indicator.querySelector('#leetvision-indicator-text') as HTMLElement;
     const iconElement = indicator.querySelector('#leetvision-indicator-icon') as HTMLElement;
     
-    if (textElement) textElement.textContent = 'Select code';
+    if (textElement) textElement.textContent = 'Select';
     if (iconElement) iconElement.style.opacity = '0.7';
     
     indicator.style.background = '#2563eb';

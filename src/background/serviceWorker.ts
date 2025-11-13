@@ -38,6 +38,18 @@ browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
+  // Handle OAuth callback from callback page
+  if (message.type === 'OAUTH_CALLBACK') {
+    // Forward to all extension contexts (popup, etc.)
+    browser.runtime.sendMessage(message).catch(() => {
+      // Extension context might not be listening, store in storage as fallback
+      browser.storage.local.set({
+        oauth_callback: message,
+      });
+    });
+    sendResponse({ success: true });
+  }
+
   return true;
 });
 

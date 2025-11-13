@@ -4,7 +4,7 @@ import {
   signUpWithEmail,
   signInWithGoogle,
   logOut,
-} from '../services/firebase';
+} from '../services/cognito';
 import { useAppSelector } from '../redux/hooks';
 import { X } from 'lucide-react';
 

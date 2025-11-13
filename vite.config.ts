@@ -17,8 +17,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: 'index.html',
+        'oauth-callback': 'public/oauth-callback.html',
       },
     },
   },
+  publicDir: 'public',
 });
 

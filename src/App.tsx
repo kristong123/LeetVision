@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from './redux/hooks';
 import { setUser, setPreferences } from './redux/slices/userSlice';
 import { setMode, setResponseLength, restoreAppState } from './redux/slices/appSlice';
-import { onAuthChange } from './services/firebase';
+import { onAuthChange } from './services/cognito';
 import { getPreferences } from './utils/storage';
 import { restoreState, saveState } from './utils/statePersistence';
 import browser from 'webextension-polyfill';
@@ -23,7 +23,7 @@ function App() {
 
   useEffect(() => {
     // Establish connection with background script for popup closure detection
-    const port = browser.runtime.connect();
+    browser.runtime.connect();
     
     // Always cancel hover mode when popup opens
     browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {

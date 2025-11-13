@@ -1,9 +1,9 @@
 import { Mode } from '../types';
-import { auth } from './firebase';
+import { getIdToken } from './cognito';
 
-// Firebase Function endpoint - update this after deploying
-const FIREBASE_FUNCTION_ENDPOINT = import.meta.env.VITE_FIREBASE_FUNCTION_URL || 
-  `https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID}.cloudfunctions.net/generateResponse`;
+// API Gateway endpoint
+const API_GATEWAY_ENDPOINT = import.meta.env.VITE_API_GATEWAY_URL || 
+  'https://oqer7bx7mj.execute-api.us-east-2.amazonaws.com/dev/response';
 
 interface GeminiRequestParams {
   code: string;
@@ -13,7 +13,7 @@ interface GeminiRequestParams {
 }
 
 /**
- * Generate AI response using Firebase Function backend
+ * Generate AI response using AWS API Gateway + Lambda backend
  * This keeps API keys secure and implements rate limiting
  */
 export const generateResponse = async ({
@@ -23,20 +23,18 @@ export const generateResponse = async ({
   userQuestion,
 }: GeminiRequestParams): Promise<string> => {
   try {
-    // Get the current user's auth token (optional)
-    const user = auth.currentUser;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
     // Add auth token if user is signed in
-    if (user) {
-      const idToken = await user.getIdToken();
+    const idToken = await getIdToken();
+    if (idToken) {
       headers['Authorization'] = `Bearer ${idToken}`;
     }
 
-    // Call Firebase Function
-    const response = await fetch(FIREBASE_FUNCTION_ENDPOINT, {
+    // Call API Gateway endpoint
+    const response = await fetch(API_GATEWAY_ENDPOINT, {
       method: 'POST',
       headers,
       body: JSON.stringify({

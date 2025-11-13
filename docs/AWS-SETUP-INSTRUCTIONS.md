@@ -30,11 +30,23 @@ Complete step-by-step instructions to migrate from Firebase to AWS.
 
 ### Step 1.2: Configure Google OAuth Provider
 
+**IMPORTANT**: Before adding Google to Cognito, you need to configure your Google OAuth client:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Select your OAuth 2.0 Client (or create a new one)
+3. **Authorized redirect URIs**: Add your Cognito domain:
+   ```
+   https://<your-cognito-domain>.auth.<region>.amazoncognito.com/oauth2/idpresponse
+   ```
+   Example: `https://us-east-2hpx0kaxqh.auth.us-east-2.amazoncognito.com/oauth2/idpresponse`
+4. Save the changes
+
+**Then in Cognito:**
 1. After pool is created, go to **Sign-in experience** → **Federated identity provider sign-in**
 2. Click **Add identity provider** → Select **Google**
-3. You'll need:
-   - **Google Client ID**: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - **Google Client Secret**: From same location
+3. Enter:
+   - **Google Client ID**: From Google Cloud Console
+   - **Google Client Secret**: From Google Cloud Console
 4. **Authorized scopes**: `openid email profile`
 5. Click **Add identity provider**
 
@@ -272,9 +284,12 @@ Since you checked CORS when creating the resource, an OPTIONS method should alre
 
 ### Step 5.2: Test API Gateway
 
-1. Go to API Gateway → `leetvision-api` → `/response` → **POST**
-2. Click **TEST**
-3. **Request body**:
+**Option 1: Test in API Gateway Console**
+1. Go to **Resources** tab (not Stages)
+2. Expand `/response` resource
+3. Click on **POST** method
+4. Click the **TEST** tab (next to Method request, Integration request, etc.)
+5. **Request body**:
 
 ```json
 {
@@ -284,7 +299,17 @@ Since you checked CORS when creating the resource, an OPTIONS method should alre
 }
 ```
 
-4. Click **Test** → Verify response
+6. Click **Test** → Verify response
+
+**Option 2: Test with Invoke URL (Recommended)**
+1. Copy your Invoke URL from Stages view: `https://oqer7bx7mj.execute-api.us-east-2.amazonaws.com/dev/response`
+2. Use curl or Postman to test:
+   ```bash
+   curl -X POST https://oqer7bx7mj.execute-api.us-east-2.amazonaws.com/dev/response \
+     -H "Content-Type: application/json" \
+     -d '{"code":"function test() { return \"hello\"; }","mode":"explain","responseLength":3}'
+   ```
+3. Or test in browser console/Postman with the same URL and body
 
 ---
 

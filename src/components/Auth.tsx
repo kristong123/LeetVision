@@ -5,7 +5,10 @@ import {
   signInWithGoogle,
   logOut,
 } from '../services/cognito';
-import { useAppSelector } from '../redux/hooks';
+import { useAppSelector, useAppDispatch } from '../redux/hooks';
+import { setUser } from '../redux/slices/userSlice';
+import browser from 'webextension-polyfill';
+import AccountLinking from './AccountLinking';
 import { X } from 'lucide-react';
 
 interface AuthProps {
@@ -14,26 +17,55 @@ interface AuthProps {
 
 const Auth = ({ onClose }: AuthProps) => {
   const { isAuthenticated } = useAppSelector((state) => state.user);
+  const dispatch = useAppDispatch();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAccountLinking, setShowAccountLinking] = useState(false);
+  const [accountLinkingData, setAccountLinkingData] = useState<{
+    email: string;
+    googleUserId: string;
+  } | null>(null);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setShowAccountLinking(false);
 
     try {
       if (isSignUp) {
         await signUpWithEmail(email, password);
+        onClose();
       } else {
-        await signInWithEmail(email, password);
+        const userData = await signInWithEmail(email, password);
+        // Update Redux state
+        dispatch(setUser({
+          uid: userData.uid,
+          email: userData.email,
+          displayName: userData.displayName,
+        }));
+        onClose();
       }
-      onClose();
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      // Check if this is an account linking opportunity
+      if (err.message?.startsWith('ACCOUNT_LINKING_NEEDED:')) {
+        try {
+          const linkingData = JSON.parse(err.message.replace('ACCOUNT_LINKING_NEEDED:', ''));
+          setAccountLinkingData({
+            email: linkingData.email,
+            googleUserId: linkingData.googleUserId,
+          });
+          setShowAccountLinking(true);
+          setError(''); // Clear error since we're showing linking UI
+        } catch (parseErr) {
+          setError(err.message || 'Authentication failed');
+        }
+      } else {
+        setError(err.message || 'Authentication failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -42,9 +74,16 @@ const Auth = ({ onClose }: AuthProps) => {
   const handleGoogleAuth = async () => {
     setError('');
     setLoading(true);
+    setShowAccountLinking(false);
 
     try {
-      await signInWithGoogle();
+      const userData = await signInWithGoogle();
+      // Update Redux state
+      dispatch(setUser({
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+      }));
       onClose();
     } catch (err: any) {
       setError(err.message || 'Google sign-in failed');
@@ -64,6 +103,42 @@ const Auth = ({ onClose }: AuthProps) => {
       setLoading(false);
     }
   };
+
+  const handleAccountLinkSuccess = () => {
+    setShowAccountLinking(false);
+    setAccountLinkingData(null);
+    // Refresh user data
+    const stored = browser.storage.local.get('cognito_user').then((result) => {
+      if (result.cognito_user) {
+        const user = result.cognito_user as { uid: string; email: string | null; displayName: string | null };
+        dispatch(setUser({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+        }));
+      }
+    });
+    onClose();
+  };
+
+  const handleAccountLinkCancel = () => {
+    setShowAccountLinking(false);
+    setAccountLinkingData(null);
+    setError('Account linking cancelled. You can continue using your current sign-in method.');
+  };
+
+  // Show account linking UI if needed
+  if (showAccountLinking && accountLinkingData) {
+    return (
+      <AccountLinking
+        email={accountLinkingData.email}
+        googleUserId={accountLinkingData.googleUserId}
+        onLink={handleAccountLinkSuccess}
+        onCancel={handleAccountLinkCancel}
+        onError={(errorMsg) => setError(errorMsg)}
+      />
+    );
+  }
 
   if (isAuthenticated) {
     return (

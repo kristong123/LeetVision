@@ -6,6 +6,36 @@ import {
 } from 'amazon-cognito-identity-js';
 import browser from 'webextension-polyfill';
 
+/**
+ * AWS Cognito Authentication Service
+ * 
+ * REQUIRED COGNITO APP CLIENT CONFIGURATION:
+ * 
+ * For Google OAuth to work properly, your Cognito App Client must have the following
+ * OAuth scopes enabled in the Hosted UI settings:
+ * 
+ * 1. Navigate to: AWS Console → Cognito → User Pools → [Your Pool] → 
+ *    App Integration → App clients and analytics → [Your Client] → Edit
+ * 
+ * 2. Under "Hosted UI" section, ensure these OAuth scopes are checked:
+ *    ☑ openid
+ *    ☑ email  
+ *    ☑ profile
+ * 
+ * 3. Under "Callback URLs", add your extension's callback URL:
+ *    chrome-extension://<your-extension-id>/oauth-callback.html
+ *    (Find your extension ID in chrome://extensions/ with Developer mode enabled)
+ * 
+ * 4. Under "Identity providers", ensure "Google" is checked
+ * 
+ * 5. Under "OAuth 2.0 grant types", ensure these are checked:
+ *    ☑ Authorization code grant
+ *    ☑ Implicit grant (optional, but recommended)
+ * 
+ * These scopes MUST match exactly what's requested in the OAuth URL.
+ * If you see an "invalid_scope" error, verify these settings match.
+ */
+
 // Cognito configuration from environment variables
 const USER_POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID || '';
 const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || '';
@@ -16,6 +46,11 @@ const REDIRECT_URI = browser.runtime.getURL('oauth-callback.html');
 if (!USER_POOL_ID || !CLIENT_ID) {
   console.error('Cognito configuration missing. Please set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID in your .env file');
   throw new Error('Cognito configuration is missing. Check your .env file.');
+}
+
+// Validate Cognito domain format (helpful for debugging)
+if (COGNITO_DOMAIN && !COGNITO_DOMAIN.includes('amazoncognito.com')) {
+  console.warn('Cognito domain may be incorrectly formatted. Expected format: https://<domain>.auth.<region>.amazoncognito.com');
 }
 
 // Initialize Cognito User Pool
@@ -73,8 +108,31 @@ export const signInWithEmail = async (
 
         resolve(userData);
       },
-      onFailure: (err) => {
-        reject(err);
+      onFailure: async (err: any) => {
+        // Provide user-friendly error messages
+        const errorCode = err?.code || err?.name || '';
+        if (errorCode === 'UserNotFoundException' || errorCode === 'NotAuthorizedException') {
+          // Check if there's a pending Google account that might need linking
+          const stored = await browser.storage.local.get('pending_account_link');
+          const pendingLink = stored.pending_account_link as { email?: string; googleUserId?: string; providerName?: string } | undefined;
+          if (pendingLink && pendingLink.email === email && pendingLink.googleUserId) {
+            // There's a Google account with the same email - this is a linking opportunity
+            reject(new Error(
+              'ACCOUNT_LINKING_NEEDED:' + JSON.stringify({
+                email,
+                googleUserId: pendingLink.googleUserId,
+                message: 'An account with this email exists from Google sign-in. Would you like to link your accounts?'
+              })
+            ));
+          } else {
+            reject(new Error(
+              'Invalid email or password. ' +
+              'If you signed up with Google, please use "Continue with Google" to sign in.'
+            ));
+          }
+        } else {
+          reject(err);
+        }
       },
     });
   });
@@ -95,9 +153,19 @@ export const signUpWithEmail = async (
       }),
     ];
 
-    userPool.signUp(email, password, attributeList, [], (err, result) => {
+    userPool.signUp(email, password, attributeList, [], (err: any, result) => {
       if (err) {
-        reject(err);
+        // Provide user-friendly error messages
+        const errorCode = err?.code || err?.name || '';
+        if (errorCode === 'UsernameExistsException' || err?.message?.includes('already exists')) {
+          reject(new Error(
+            'An account with this email already exists. ' +
+            'If you signed up with Google, please use "Continue with Google" to sign in. ' +
+            'Otherwise, use the "Sign In" option.'
+          ));
+        } else {
+          reject(err);
+        }
         return;
       }
 
@@ -113,23 +181,68 @@ export const signUpWithEmail = async (
 /**
  * Sign in with Google using Cognito Hosted UI
  * Opens OAuth flow in a new browser tab
+ * 
+ * IMPORTANT: Ensure your Cognito App Client has these OAuth scopes enabled:
+ * - openid
+ * - email
+ * - profile
+ * 
+ * These must match exactly what's configured in:
+ * Cognito → User Pool → App Integration → App clients → [Your Client] → Hosted UI → Allowed OAuth scopes
  */
 export const signInWithGoogle = async (): Promise<CognitoUserData> => {
   return new Promise(async (resolve, reject) => {
     try {
-      // Build OAuth URL
-      const clientId = CLIENT_ID;
-      const redirectUri = encodeURIComponent(REDIRECT_URI);
-      const responseType = 'code';
-      const scope = 'openid email profile';
-      const identityProvider = 'Google';
+      // Validate required configuration
+      if (!COGNITO_DOMAIN) {
+        reject(new Error('Cognito domain is not configured. Please set VITE_COGNITO_DOMAIN in your .env file'));
+        return;
+      }
 
-      const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?` +
-        `client_id=${clientId}&` +
-        `response_type=${responseType}&` +
-        `scope=${scope}&` +
-        `redirect_uri=${redirectUri}&` +
-        `identity_provider=${identityProvider}`;
+      // Define required OAuth scopes (must match Cognito App Client configuration)
+      // These scopes must be space-separated: 'openid email profile'
+      const requiredScopes = ['openid', 'email', 'profile'];
+      const scopeString = requiredScopes.join(' ');
+
+      // Build OAuth URL with manual parameter encoding
+      // Note: We manually encode parameters to ensure proper formatting
+      // Cognito is sensitive to scope encoding - spaces should be encoded as %20, not +
+      // identity_provider should match the provider name configured in Cognito
+      // Try lowercase 'google' first as some Cognito configurations are case-sensitive
+      // If this fails, try without identity_provider parameter to show provider selection
+      const identityProvider = 'google'; // Try lowercase first (some Cognito configs are case-sensitive)
+      
+      const params = [
+        `client_id=${encodeURIComponent(CLIENT_ID)}`,
+        `response_type=${encodeURIComponent('code')}`,
+        `scope=${encodeURIComponent(scopeString)}`, // Encode scope with spaces as %20
+        `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
+        `identity_provider=${encodeURIComponent(identityProvider)}`, // Use lowercase 'google'
+      ].join('&');
+
+      const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params}`;
+      
+      // Debug: log the URL and configuration
+      console.log('OAuth URL (should redirect to Google):', authUrl);
+      console.log('Redirect URI:', REDIRECT_URI);
+      console.log('Cognito Domain:', COGNITO_DOMAIN);
+      console.log('Requested scopes:', scopeString);
+      console.log('Identity provider:', identityProvider);
+      console.log('Scope parameter in URL:', authUrl.match(/scope=([^&]+)/)?.[1] || 'not found');
+      console.log('Expected flow: Cognito → Google → Cognito → Extension callback');
+      console.log('Note: If you see invalid_scope error, verify Cognito App Client has these scopes enabled: openid, email, profile');
+      
+      // Validate that the scope parameter is properly formatted
+      if (!authUrl.includes('scope=')) {
+        reject(new Error('Failed to construct OAuth URL with scope parameter'));
+        return;
+      }
+      
+      // Verify scope encoding (should have %20 for spaces, not +)
+      const scopeParam = authUrl.match(/scope=([^&]+)/)?.[1];
+      if (scopeParam && scopeParam.includes('+')) {
+        console.warn('Warning: Scope parameter contains + instead of %20. This may cause issues with Cognito.');
+      }
 
       // Store pending auth state
       await browser.storage.local.set({ oauth_pending: true });
@@ -154,7 +267,21 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
           }
           
           if (result?.error) {
-            reject(new Error(result.error));
+            // Provide more specific error messages for common OAuth errors
+            const errorMsg = result.error.toLowerCase();
+            if (errorMsg.includes('invalid_scope') || errorMsg.includes('invalid scope')) {
+              reject(new Error(
+                'Invalid scope error. Please verify that your Cognito App Client has the following OAuth scopes enabled: openid, email, profile. ' +
+                'Check: Cognito → User Pool → App Integration → App clients → [Your Client] → Hosted UI → Allowed OAuth scopes'
+              ));
+            } else if (errorMsg.includes('redirect_uri') || errorMsg.includes('redirect uri')) {
+              reject(new Error(
+                `Redirect URI mismatch. Expected: ${REDIRECT_URI}. ` +
+                'Please verify the callback URL is added to your Cognito App Client settings.'
+              ));
+            } else {
+              reject(new Error(result.error));
+            }
           } else if (result?.code) {
             // Exchange code for tokens
             exchangeCodeForTokens(result.code)
@@ -216,52 +343,207 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
 
 /**
  * Exchange authorization code for tokens
+ * 
+ * This function exchanges the OAuth authorization code received from Cognito
+ * for ID and access tokens. The tokens contain user information based on the
+ * scopes requested during the OAuth flow (openid, email, profile).
  */
 async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
   const tokenUrl = `${COGNITO_DOMAIN}/oauth2/token`;
   const clientId = CLIENT_ID;
   const redirectUri = REDIRECT_URI;
 
-  const response = await fetch(tokenUrl, {
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        code: code,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    if (!response.ok) {
+      // Try to get detailed error information
+      let errorMessage = 'Failed to exchange code for tokens';
+      try {
+        const errorData = await response.json();
+        const errorDesc = errorData.error_description || errorData.error || '';
+        errorMessage = `Token exchange failed: ${errorDesc}`;
+        
+        // Provide specific guidance for common errors
+        if (errorDesc.toLowerCase().includes('invalid_grant') || errorDesc.toLowerCase().includes('invalid grant')) {
+          errorMessage += '. The authorization code may have expired or been used already.';
+        } else if (errorDesc.toLowerCase().includes('invalid_client') || errorDesc.toLowerCase().includes('invalid client')) {
+          errorMessage += '. Please verify your Cognito Client ID is correct.';
+        }
+        
+        console.error('Token exchange error:', errorData);
+      } catch (e) {
+        // If we can't parse the error response, use the status text
+        errorMessage = `Token exchange failed with status ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    const { id_token, access_token } = data;
+
+    if (!id_token || !access_token) {
+      throw new Error('Missing tokens in response from Cognito');
+    }
+
+    // Decode JWT to get user info
+    const payload = JSON.parse(atob(id_token.split('.')[1]));
+
+    const userData: CognitoUserData = {
+      uid: payload.sub,
+      email: payload.email || null,
+      displayName: payload.name || payload['cognito:username'] || null,
+      idToken: id_token,
+      accessToken: access_token,
+    };
+
+    // Check if this is a federated identity (Google) and if an email account might exist
+    // We can detect this by checking if the identity provider is Google
+    // and if the username format suggests it's a federated user
+    const isFederatedUser = payload.identities && payload.identities.length > 0;
+    const isGoogleUser = isFederatedUser && 
+      payload.identities.some((id: any) => id.providerName === 'Google' || id.providerName === 'google');
+    
+    // Store account linking metadata if this is a Google user
+    if (isGoogleUser && userData.email) {
+      await browser.storage.local.set({
+        pending_account_link: {
+          googleUserId: payload.sub,
+          email: userData.email,
+          providerName: 'Google',
+        },
+      });
+    }
+
+    // Store tokens in extension storage
+    await browser.storage.local.set({
+      cognito_id_token: id_token,
+      cognito_access_token: access_token,
+      cognito_user: userData,
+    });
+
+    return userData;
+  } catch (err: any) {
+    // Re-throw with additional context if it's not already an Error
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error(`Token exchange failed: ${err?.message || String(err)}`);
+  }
+}
+
+/**
+ * Check if an account exists with the given email
+ * This is used to detect if a user trying to sign in with Google
+ * already has an email/password account
+ */
+/**
+ * Check if an account exists with the given email
+ * Note: This is a placeholder - actual checking happens through sign-in attempts
+ * and conflict detection
+ */
+export const checkAccountExists = async (_email: string): Promise<{ exists: boolean; userId?: string }> => {
+  // We can't directly query Cognito from the client without admin permissions
+  // Account existence is detected through sign-in failures and conflict detection
+  return { exists: false };
+};
+
+/**
+ * Link a federated identity (Google) to an existing Cognito user account
+ * @param sourceUserId - User ID from the federated provider (Google account)
+ * @param destinationUserId - User ID from Cognito (email/password account)
+ * @param providerName - Identity provider name (e.g., "Google")
+ * @param idToken - ID token from current session for authentication
+ */
+export const linkAccounts = async (
+  sourceUserId: string,
+  destinationUserId: string,
+  providerName: string,
+  idToken: string
+): Promise<void> => {
+  const apiGatewayUrl = import.meta.env.VITE_API_GATEWAY_URL;
+  
+  if (!apiGatewayUrl) {
+    throw new Error('API Gateway URL is not configured. Please set VITE_API_GATEWAY_URL in your .env file');
+  }
+
+  // Construct the account linking endpoint
+  // Assuming the endpoint will be at /link-account
+  const linkAccountUrl = apiGatewayUrl.replace(/\/response$/, '/link-account');
+
+  const response = await fetch(linkAccountUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`,
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: clientId,
-      code: code,
-      redirect_uri: redirectUri,
+    body: JSON.stringify({
+      sourceUserId,
+      destinationUserId,
+      providerName,
+      idToken,
     }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to exchange code for tokens');
+    let errorMessage = 'Account linking failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+      
+      // Provide specific error messages based on status code
+      if (response.status === 400) {
+        if (errorMessage.includes('emails do not match')) {
+          errorMessage = 'Cannot link accounts: The email addresses do not match.';
+        } else if (errorMessage.includes('not found')) {
+          errorMessage = 'One or both accounts were not found. Please ensure both accounts exist.';
+        }
+      } else if (response.status === 404) {
+        errorMessage = 'Account not found. Please ensure the email account exists.';
+      } else if (response.status === 409) {
+        errorMessage = 'These accounts are already linked.';
+      } else if (response.status === 500) {
+        errorMessage = 'Server error during account linking. Please try again later.';
+      }
+    } catch (e) {
+      // If we can't parse the error, use the status text
+      errorMessage = `Account linking failed: ${response.status} ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
 
-  const data = await response.json();
-  const { id_token, access_token } = data;
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Account linking failed');
+  }
+};
 
-  // Decode JWT to get user info
-  const payload = JSON.parse(atob(id_token.split('.')[1]));
-
-  const userData: CognitoUserData = {
-    uid: payload.sub,
-    email: payload.email || null,
-    displayName: payload.name || payload['cognito:username'] || null,
-    idToken: id_token,
-    accessToken: access_token,
-  };
-
-  // Store tokens in extension storage
-  await browser.storage.local.set({
-    cognito_id_token: id_token,
-    cognito_access_token: access_token,
-    cognito_user: userData,
-  });
-
-  return userData;
-}
+/**
+ * Check if a Google-signed-in user needs to link with an existing email account
+ * This is called after successful Google sign-in to detect conflicts
+ * 
+ * Note: Actual conflict detection happens when user attempts email sign-in
+ * and we check for pending_account_link in storage
+ */
+export const checkAccountLinkingNeeded = async (
+  _googleUserEmail: string,
+  _googleUserId: string
+): Promise<{ needsLinking: boolean; existingUserId?: string }> => {
+  // Conflict detection is handled in signInWithEmail's error handler
+  // which checks for pending_account_link when email sign-in fails
+  return { needsLinking: false };
+};
 
 /**
  * Sign out current user

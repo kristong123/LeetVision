@@ -77,6 +77,22 @@ Complete step-by-step instructions to migrate from Firebase to AWS.
 3. Check availability → **Save changes**
 4. Note down your domain URL: `https://leetvision-auth.auth.us-east-1.amazoncognito.com`
 
+### Step 1.5: Enable Hosted UI (Required for Google OAuth)
+
+1. Go to **App Integration** → **App clients and analytics**
+2. Click on your app client → **Edit**
+3. Scroll to **Hosted UI** section
+4. **IMPORTANT**: Ensure Hosted UI is enabled (it should be by default)
+5. Under **Allowed OAuth scopes**, check:
+   - ☑ `openid`
+   - ☑ `email`
+   - ☑ `profile`
+6. Under **Callback URLs**, add:
+   - `chrome-extension://<your-extension-id>/oauth-callback.html`
+   - (Find your extension ID in `chrome://extensions/` with Developer mode enabled)
+7. Under **Identity providers**, ensure **Google** is checked
+8. Click **Save changes**
+
 **Save these values in your notes:**
 - User Pool ID: ____________________
 - App Client ID: ____________________
@@ -357,6 +373,36 @@ LAMBDA_FUNCTION_NAME=leetvision-generate-response
 
 ### Issue: Cognito OAuth redirect not working
 - **Fix**: Check callback URLs match in App Client settings (Step 1.3)
+
+### Issue: `invalid_scope` error when signing in with Google
+- **Fix**: 
+  1. Go to Cognito → Your User Pool → **App Integration** → **App clients and analytics**
+  2. Click on your app client → **Edit**
+  3. Scroll to **Hosted UI** section
+  4. Under **Allowed OAuth scopes**, ensure these are checked:
+     - ☑ `openid`
+     - ☑ `email`
+     - ☑ `profile`
+  5. Under **Callback URLs**, add your extension's callback URL:
+     - `chrome-extension://<your-extension-id>/oauth-callback.html`
+     - Find your extension ID in `chrome://extensions/` (enable Developer mode)
+  6. Under **Identity providers**, ensure **Google** is checked
+  7. Click **Save changes**
+
+### Issue: Google sign-in doesn't redirect to Google (stays on Cognito page)
+- **Fix**: 
+  1. Verify Google identity provider is configured:
+     - Go to **Sign-in experience** → **Federated identity provider sign-in**
+     - Ensure Google is listed and configured with Client ID and Secret
+  2. Verify Hosted UI is enabled:
+     - Go to **App Integration** → **App clients** → Edit your app client
+     - Under **Hosted UI**, ensure it's enabled
+  3. Check the identity provider name matches:
+     - In the code, we use `identity_provider=Google`
+     - Verify this matches the provider name in Cognito (usually "Google" or "google")
+  4. Test the URL directly in a browser:
+     - Open: `https://<your-cognito-domain>/oauth2/authorize?client_id=<client-id>&response_type=code&scope=openid+email+profile&redirect_uri=<callback-url>&identity_provider=Google`
+     - This should redirect to Google's sign-in page
 
 ### Issue: TTL not working in DynamoDB
 - **Fix**: Ensure TTL attribute is named `ttl` and is a Number type

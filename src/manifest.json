@@ -40,7 +40,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "oauth-callback.html"],
+      "resources": ["icons/*", "oauth-callback.html", "oauth-callback.js"],
       "matches": ["<all_urls>"]
     }
   ]

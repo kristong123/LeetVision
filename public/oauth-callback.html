@@ -38,76 +38,7 @@
     <div class="spinner"></div>
     <p>Completing sign-in...</p>
   </div>
-  <script>
-    // Extract authorization code from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const error = urlParams.get('error');
-    const errorDescription = urlParams.get('error_description');
-
-    if (error) {
-      // Store error in extension storage
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.set({
-          oauth_result: {
-            error: errorDescription || error,
-          },
-        });
-      }
-      document.querySelector('.container').innerHTML = `
-        <div style="color: #dc2626;">
-          <h2>Sign-in Error</h2>
-          <p>${errorDescription || error}</p>
-          <p style="font-size: 0.875rem; margin-top: 1rem;">You can close this tab.</p>
-        </div>
-      `;
-      
-      // Close tab after a delay
-      setTimeout(() => {
-        window.close();
-      }, 3000);
-    } else if (code) {
-      // Store code in extension storage
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.set({
-          oauth_result: {
-            code: code,
-          },
-        });
-      }
-      document.querySelector('.container').innerHTML = `
-        <div style="color: #059669;">
-          <h2>Sign-in Successful!</h2>
-          <p>You can close this tab and return to the extension.</p>
-        </div>
-      `;
-      
-      // Close tab after a short delay
-      setTimeout(() => {
-        window.close();
-      }, 2000);
-    } else {
-      // Store error
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.set({
-          oauth_result: {
-            error: 'No authorization code received',
-          },
-        });
-      }
-      document.querySelector('.container').innerHTML = `
-        <div style="color: #dc2626;">
-          <h2>Error</h2>
-          <p>No authorization code received.</p>
-          <p style="font-size: 0.875rem; margin-top: 1rem;">You can close this tab.</p>
-        </div>
-      `;
-      
-      setTimeout(() => {
-        window.close();
-      }, 3000);
-    }
-  </script>
+  <script src="oauth-callback.js"></script>
 </body>
 </html>
 

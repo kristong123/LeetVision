@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test OAuth URL</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .input-group {
+      margin: 20px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .url-display {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .info {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 15px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test Cognito OAuth URL</h1>
+  
+  <div class="info">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Enter your Cognito configuration values below</li>
+      <li>Click "Test OAuth URL" to open the URL in a new tab</li>
+      <li>If configured correctly, it should redirect to Google's sign-in page</li>
+      <li>If you see an error, check the URL and Cognito settings</li>
+    </ol>
+  </div>
+
+  <div class="input-group">
+    <label for="domain">Cognito Domain:</label>
+    <input type="text" id="domain" value="https://us-east-2hpx0kaxqh.auth.us-east-2.amazoncognito.com" placeholder="https://your-domain.auth.region.amazoncognito.com">
+  </div>
+
+  <div class="input-group">
+    <label for="clientId">Client ID:</label>
+    <input type="text" id="clientId" value="jjt69oab9uo8bkmjqtmkoc2os" placeholder="Your Cognito App Client ID">
+  </div>
+
+  <div class="input-group">
+    <label for="redirectUri">Redirect URI (Extension Callback):</label>
+    <input type="text" id="redirectUri" value="chrome-extension://lfoioobabgcngfgphggeiifkhpmmcnfe/oauth-callback.html" placeholder="chrome-extension://...">
+  </div>
+
+  <button onclick="testOAuth()">Test OAuth URL</button>
+  <button onclick="copyUrl()" style="background: #059669; margin-left: 10px;">Copy URL</button>
+
+  <div id="urlDisplay" class="url-display" style="display: none;"></div>
+
+  <script>
+    function buildOAuthUrl() {
+      const domain = document.getElementById('domain').value.trim();
+      const clientId = document.getElementById('clientId').value.trim();
+      const redirectUri = document.getElementById('redirectUri').value.trim();
+
+      if (!domain || !clientId || !redirectUri) {
+        alert('Please fill in all fields');
+        return null;
+      }
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        response_type: 'code',
+        scope: 'openid email profile',
+        redirect_uri: redirectUri,
+        identity_provider: 'Google',
+      });
+
+      return `${domain}/oauth2/authorize?${params.toString()}`;
+    }
+
+    function testOAuth() {
+      const url = buildOAuthUrl();
+      if (url) {
+        // Display the URL
+        const display = document.getElementById('urlDisplay');
+        display.textContent = url;
+        display.style.display = 'block';
+        
+        // Open in new tab
+        window.open(url, '_blank');
+      }
+    }
+
+    function copyUrl() {
+      const url = buildOAuthUrl();
+      if (url) {
+        navigator.clipboard.writeText(url).then(() => {
+          alert('URL copied to clipboard!');
+        }).catch(() => {
+          // Fallback
+          const textarea = document.createElement('textarea');
+          textarea.value = url;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          alert('URL copied to clipboard!');
+        });
+      }
+    }
+  </script>
+</body>
+</html>
+

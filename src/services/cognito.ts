@@ -111,7 +111,19 @@ export const signInWithEmail = async (
       onFailure: async (err: any) => {
         // Provide user-friendly error messages
         const errorCode = err?.code || err?.name || '';
-        if (errorCode === 'UserNotFoundException' || errorCode === 'NotAuthorizedException') {
+        if (errorCode === 'UserNotConfirmedException') {
+          // User exists but email is not verified - allow sign-in anyway
+          // We'll authenticate them but they'll remain unverified
+          // Try to authenticate using a workaround: we can't directly authenticate unverified users,
+          // but we can allow them to proceed by catching this error and providing a way forward
+          // For now, we'll reject with a specific error that the UI can handle
+          reject(new Error(
+            'UNVERIFIED_USER:' + JSON.stringify({
+              email,
+              message: 'Your email is not verified. You can still sign in, but we recommend verifying your email.'
+            })
+          ));
+        } else if (errorCode === 'UserNotFoundException' || errorCode === 'NotAuthorizedException') {
           // Check if there's a pending Google account that might need linking
           const stored = await browser.storage.local.get('pending_account_link');
           const pendingLink = stored.pending_account_link as { email?: string; googleUserId?: string; providerName?: string } | undefined;
@@ -131,7 +143,7 @@ export const signInWithEmail = async (
             ));
           }
         } else {
-          reject(err);
+        reject(err);
         }
       },
     });
@@ -164,7 +176,7 @@ export const signUpWithEmail = async (
             'Otherwise, use the "Sign In" option.'
           ));
         } else {
-          reject(err);
+        reject(err);
         }
         return;
       }
@@ -174,6 +186,65 @@ export const signUpWithEmail = async (
         // For now, we'll auto-confirm if email verification is not required
         resolve();
       }
+    });
+  });
+};
+
+/**
+ * Confirm user sign up with verification code
+ */
+export const confirmSignUp = async (
+  email: string,
+  code: string
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const cognitoUser = new CognitoUser({
+      Username: email,
+      Pool: userPool,
+    });
+
+    cognitoUser.confirmRegistration(code, true, (err: any) => {
+      if (err) {
+        const errorCode = err?.code || err?.name || '';
+        if (errorCode === 'CodeMismatchException' || errorCode === 'ExpiredCodeException') {
+          reject(new Error(
+            errorCode === 'ExpiredCodeException'
+              ? 'Verification code has expired. Please request a new code.'
+              : 'Invalid verification code. Please check your email and try again.'
+          ));
+        } else {
+          reject(err);
+        }
+        return;
+      }
+      resolve();
+    });
+  });
+};
+
+/**
+ * Resend confirmation code to user's email
+ */
+export const resendConfirmationCode = async (
+  email: string
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const cognitoUser = new CognitoUser({
+      Username: email,
+      Pool: userPool,
+    });
+
+    cognitoUser.resendConfirmationCode((err: any) => {
+      if (err) {
+        const errorCode = err?.code || err?.name || '';
+        if (errorCode === 'LimitExceededException') {
+          reject(new Error('Too many requests. Please wait a few minutes before requesting another code.'));
+        } else {
+          reject(err);
+        }
+        return;
+      }
+      resolve();
     });
   });
 };
@@ -280,7 +351,7 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
                 'Please verify the callback URL is added to your Cognito App Client settings.'
               ));
             } else {
-              reject(new Error(result.error));
+            reject(new Error(result.error));
             }
           } else if (result?.code) {
             // Exchange code for tokens
@@ -354,20 +425,20 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
   const redirectUri = REDIRECT_URI;
 
   try {
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        code: code,
-        redirect_uri: redirectUri,
-      }),
-    });
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: clientId,
+      code: code,
+      redirect_uri: redirectUri,
+    }),
+  });
 
-    if (!response.ok) {
+  if (!response.ok) {
       // Try to get detailed error information
       let errorMessage = 'Failed to exchange code for tokens';
       try {
@@ -388,25 +459,25 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
         errorMessage = `Token exchange failed with status ${response.status}: ${response.statusText}`;
       }
       throw new Error(errorMessage);
-    }
+  }
 
-    const data = await response.json();
-    const { id_token, access_token } = data;
+  const data = await response.json();
+  const { id_token, access_token } = data;
 
     if (!id_token || !access_token) {
       throw new Error('Missing tokens in response from Cognito');
     }
 
-    // Decode JWT to get user info
-    const payload = JSON.parse(atob(id_token.split('.')[1]));
+  // Decode JWT to get user info
+  const payload = JSON.parse(atob(id_token.split('.')[1]));
 
-    const userData: CognitoUserData = {
-      uid: payload.sub,
-      email: payload.email || null,
-      displayName: payload.name || payload['cognito:username'] || null,
-      idToken: id_token,
-      accessToken: access_token,
-    };
+  const userData: CognitoUserData = {
+    uid: payload.sub,
+    email: payload.email || null,
+    displayName: payload.name || payload['cognito:username'] || null,
+    idToken: id_token,
+    accessToken: access_token,
+  };
 
     // Check if this is a federated identity (Google) and if an email account might exist
     // We can detect this by checking if the identity provider is Google
@@ -426,14 +497,14 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
       });
     }
 
-    // Store tokens in extension storage
-    await browser.storage.local.set({
-      cognito_id_token: id_token,
-      cognito_access_token: access_token,
-      cognito_user: userData,
-    });
+  // Store tokens in extension storage
+  await browser.storage.local.set({
+    cognito_id_token: id_token,
+    cognito_access_token: access_token,
+    cognito_user: userData,
+  });
 
-    return userData;
+  return userData;
   } catch (err: any) {
     // Re-throw with additional context if it's not already an Error
     if (err instanceof Error) {

@@ -4,6 +4,8 @@ import {
   signUpWithEmail,
   signInWithGoogle,
   logOut,
+  confirmSignUp,
+  resendConfirmationCode,
 } from '../services/cognito';
 import { useAppSelector, useAppDispatch } from '../redux/hooks';
 import { setUser } from '../redux/slices/userSlice';
@@ -28,6 +30,11 @@ const Auth = ({ onClose }: AuthProps) => {
     email: string;
     googleUserId: string;
   } | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingPassword, setPendingPassword] = useState('');
+  const [resendingCode, setResendingCode] = useState(false);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +45,11 @@ const Auth = ({ onClose }: AuthProps) => {
     try {
       if (isSignUp) {
         await signUpWithEmail(email, password);
-        onClose();
+        // Show verification UI instead of closing
+        setPendingEmail(email);
+        setPendingPassword(password);
+        setShowVerification(true);
+        setError('');
       } else {
         const userData = await signInWithEmail(email, password);
         // Update Redux state
@@ -50,8 +61,19 @@ const Auth = ({ onClose }: AuthProps) => {
         onClose();
       }
     } catch (err: any) {
-      // Check if this is an account linking opportunity
-      if (err.message?.startsWith('ACCOUNT_LINKING_NEEDED:')) {
+      // Check if this is an unverified user trying to sign in
+      if (err.message?.startsWith('UNVERIFIED_USER:')) {
+        try {
+          const unverifiedData = JSON.parse(err.message.replace('UNVERIFIED_USER:', ''));
+          setPendingEmail(unverifiedData.email);
+          setPendingPassword(password);
+          setShowVerification(true);
+          setError('Please verify your email to sign in. You can also skip verification for now.');
+        } catch (parseErr) {
+          setError(err.message || 'Authentication failed');
+        }
+      } else if (err.message?.startsWith('ACCOUNT_LINKING_NEEDED:')) {
+        // Check if this is an account linking opportunity
         try {
           const linkingData = JSON.parse(err.message.replace('ACCOUNT_LINKING_NEEDED:', ''));
           setAccountLinkingData({
@@ -126,6 +148,134 @@ const Auth = ({ onClose }: AuthProps) => {
     setAccountLinkingData(null);
     setError('Account linking cancelled. You can continue using your current sign-in method.');
   };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verificationCode.trim()) {
+      setError('Please enter the verification code');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      await confirmSignUp(pendingEmail, verificationCode);
+      // Verification successful - try to sign in
+      const userData = await signInWithEmail(pendingEmail, pendingPassword);
+      dispatch(setUser({
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+      }));
+      setShowVerification(false);
+      setVerificationCode('');
+      setPendingEmail('');
+      setPendingPassword('');
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setError('');
+    setResendingCode(true);
+
+    try {
+      await resendConfirmationCode(pendingEmail);
+      setError('Verification code sent! Please check your email.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend code');
+    } finally {
+      setResendingCode(false);
+    }
+  };
+
+  const handleSkipVerification = () => {
+    setShowVerification(false);
+    setVerificationCode('');
+    setPendingEmail('');
+    setPendingPassword('');
+    setError('You can verify your email later. Note: You will need to verify your email before you can sign in.');
+    // Note: User cannot actually sign in without verification due to Cognito restrictions
+    // This just closes the verification UI
+  };
+
+  // Show verification UI if needed
+  if (showVerification && pendingEmail) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md mx-4 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Verify Your Email
+            </h2>
+            <button
+              onClick={handleSkipVerification}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            We've sent a verification code to <strong>{pendingEmail}</strong>. 
+            Please enter the code below to verify your email address.
+          </p>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Verification Code
+              </label>
+              <input
+                type="text"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                required
+                maxLength={6}
+                placeholder="000000"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !verificationCode.trim()}
+              className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              {loading ? 'Verifying...' : 'Verify Email'}
+            </button>
+          </form>
+
+          <div className="mt-4 space-y-2">
+            <button
+              onClick={handleResendCode}
+              disabled={resendingCode}
+              className="w-full text-sm text-blue-500 hover:underline disabled:opacity-50"
+            >
+              {resendingCode ? 'Sending...' : 'Resend verification code'}
+            </button>
+            <button
+              onClick={handleSkipVerification}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              Skip for now (verify later)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show account linking UI if needed
   if (showAccountLinking && accountLinkingData) {

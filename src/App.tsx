@@ -106,6 +106,16 @@ function App() {
     return () => unsubscribe();
   }, [dispatch]);
 
+  // Watch for theme changes and apply them dynamically
+  const preferences = useAppSelector((state) => state.user.preferences);
+  useEffect(() => {
+    if (preferences.theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [preferences.theme]);
+
   // Save state whenever appState changes
   useEffect(() => {
     // Don't save initial state immediately

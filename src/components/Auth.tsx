@@ -130,7 +130,7 @@ const Auth = ({ onClose }: AuthProps) => {
     setShowAccountLinking(false);
     setAccountLinkingData(null);
     // Refresh user data
-    const stored = browser.storage.local.get('cognito_user').then((result) => {
+    browser.storage.local.get('cognito_user').then((result) => {
       if (result.cognito_user) {
         const user = result.cognito_user as { uid: string; email: string | null; displayName: string | null };
         dispatch(setUser({

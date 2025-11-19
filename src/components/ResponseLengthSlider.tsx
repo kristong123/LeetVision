@@ -1,5 +1,7 @@
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { setResponseLength } from '../redux/slices/appSlice';
+import { setPreferences } from '../redux/slices/userSlice';
+import { savePreferences } from '../utils/storage';
 
 const ResponseLengthSlider = () => {
   const dispatch = useAppDispatch();
@@ -19,7 +21,12 @@ const ResponseLengthSlider = () => {
           min="1"
           max="5"
           value={responseLength}
-          onChange={(e) => dispatch(setResponseLength(Number(e.target.value)))}
+          onChange={(e) => {
+            const newLength = Number(e.target.value);
+            dispatch(setResponseLength(newLength));
+            dispatch(setPreferences({ responseLength: newLength }));
+            savePreferences({ responseLength: newLength });
+          }}
           className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
         />
         <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">

@@ -1,6 +1,8 @@
 import { Mode } from '../types';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { setMode } from '../redux/slices/appSlice';
+import { setPreferences } from '../redux/slices/userSlice';
+import { savePreferences } from '../utils/storage';
 
 const modes: { value: Mode; label: string; color: string }[] = [
   { value: 'learn', label: 'Learn Mode', color: '#059669' },
@@ -23,7 +25,13 @@ const ModeSelector = () => {
         {modes.map((mode) => (
           <button
             key={mode.value}
-            onClick={() => hasCode && dispatch(setMode(mode.value))}
+            onClick={() => {
+              if (hasCode) {
+                dispatch(setMode(mode.value));
+                dispatch(setPreferences({ selectedMode: mode.value }));
+                savePreferences({ selectedMode: mode.value });
+              }
+            }}
             disabled={!hasCode}
             style={{
               backgroundColor: currentMode === mode.value ? mode.color : undefined,

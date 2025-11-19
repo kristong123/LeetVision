@@ -37,3 +37,6 @@ dist/
 *.crx
 *.pem
 *.zip
+
+# Documentation
+docs/

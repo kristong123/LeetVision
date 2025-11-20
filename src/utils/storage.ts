@@ -28,7 +28,7 @@ export const getPreferences = async (): Promise<UserPreferences> => {
       return prefs as UserPreferences;
     }
     return {
-      theme: 'light',
+      theme: 'dark',
       displayMode: 'floating',
       selectedMode: 'learn',
       responseLength: 3,
@@ -36,7 +36,7 @@ export const getPreferences = async (): Promise<UserPreferences> => {
   } catch (error) {
     console.error('Error getting preferences:', error);
     return {
-      theme: 'light',
+      theme: 'dark',
       displayMode: 'floating',
       selectedMode: 'learn',
       responseLength: 3,

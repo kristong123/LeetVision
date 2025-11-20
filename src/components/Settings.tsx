@@ -20,12 +20,12 @@ const Settings = ({ onClose }: SettingsProps) => {
     });
   }, []);
 
-  const handleThemeToggle = () => {
-    const newTheme = preferences.theme === 'light' ? 'dark' : 'light';
+  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newTheme = e.target.value as 'light' | 'dark';
     dispatch(setPreferences({ theme: newTheme }));
     savePreferences({ theme: newTheme });
     
-    // Apply theme to document
+    // Apply theme to document (also handled by useEffect in App.tsx, but applying here for immediate feedback)
     if (newTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -56,23 +56,19 @@ const Settings = ({ onClose }: SettingsProps) => {
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Theme Toggle */}
+          {/* Theme Selector */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Theme
             </span>
-            <button
-              onClick={handleThemeToggle}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                preferences.theme === 'dark' ? 'bg-blue-500' : 'bg-gray-300'
-              }`}
+            <select
+              value={preferences.theme}
+              onChange={handleThemeChange}
+              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
           </div>
 
           {/* Display Mode Toggle */}

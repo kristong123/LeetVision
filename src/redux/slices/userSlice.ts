@@ -5,7 +5,7 @@ const initialState: UserState = {
   isAuthenticated: false,
   user: null,
   preferences: {
-    theme: 'light',
+    theme: 'dark',
     displayMode: 'floating',
     selectedMode: 'learn',
     responseLength: 3,

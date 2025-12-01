@@ -39,7 +39,13 @@ const shouldExcludeElement = (element: HTMLElement): boolean => {
   }
   
   // Exclude if element has very little content (likely not code)
-  const text = element.textContent?.trim() || '';
+  let text = element.textContent?.trim() || '';
+  
+  // For inputs and textareas, use value instead of textContent
+  if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+    text = (element as HTMLInputElement | HTMLTextAreaElement).value || '';
+  }
+
   if (text.length < 10) {
     return true;
   }

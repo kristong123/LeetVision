@@ -60,33 +60,34 @@ const Auth = ({ onClose }: AuthProps) => {
         }));
         onClose();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       // Check if this is an unverified user trying to sign in
-      if (err.message?.startsWith('UNVERIFIED_USER:')) {
+      if (error.message?.startsWith('UNVERIFIED_USER:')) {
         try {
-          const unverifiedData = JSON.parse(err.message.replace('UNVERIFIED_USER:', ''));
+          const unverifiedData = JSON.parse(error.message.replace('UNVERIFIED_USER:', ''));
           setPendingEmail(unverifiedData.email);
           setPendingPassword(password);
           setShowVerification(true);
           setError('Please verify your email to sign in. You can also skip verification for now.');
-        } catch (parseErr) {
-          setError(err.message || 'Authentication failed');
+        } catch {
+          setError(error.message || 'Authentication failed');
         }
-      } else if (err.message?.startsWith('ACCOUNT_LINKING_NEEDED:')) {
+      } else if (error.message?.startsWith('ACCOUNT_LINKING_NEEDED:')) {
         // Check if this is an account linking opportunity
         try {
-          const linkingData = JSON.parse(err.message.replace('ACCOUNT_LINKING_NEEDED:', ''));
+          const linkingData = JSON.parse(error.message.replace('ACCOUNT_LINKING_NEEDED:', ''));
           setAccountLinkingData({
             email: linkingData.email,
             googleUserId: linkingData.googleUserId,
           });
           setShowAccountLinking(true);
           setError(''); // Clear error since we're showing linking UI
-        } catch (parseErr) {
-          setError(err.message || 'Authentication failed');
+        } catch {
+          setError(error.message || 'Authentication failed');
         }
       } else {
-        setError(err.message || 'Authentication failed');
+        setError(error.message || 'Authentication failed');
       }
     } finally {
       setLoading(false);
@@ -107,8 +108,9 @@ const Auth = ({ onClose }: AuthProps) => {
         displayName: userData.displayName,
       }));
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Google sign-in failed');
+      onClose();
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Google sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -119,8 +121,8 @@ const Auth = ({ onClose }: AuthProps) => {
     try {
       await logOut();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Logout failed');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Logout failed');
     } finally {
       setLoading(false);
     }
@@ -173,8 +175,8 @@ const Auth = ({ onClose }: AuthProps) => {
       setPendingEmail('');
       setPendingPassword('');
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Verification failed');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Verification failed');
     } finally {
       setLoading(false);
     }
@@ -187,8 +189,8 @@ const Auth = ({ onClose }: AuthProps) => {
     try {
       await resendConfirmationCode(pendingEmail);
       setError('Verification code sent! Please check your email.');
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend code');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to resend code');
     } finally {
       setResendingCode(false);
     }

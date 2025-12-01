@@ -12,45 +12,48 @@ try {
 }
 
 // Listen for messages from popup or background script
-browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
-  console.log('LeetVision: Received message:', message.type);
+browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  const msg = message as { type: string; sectionId?: string; [key: string]: unknown };
+  console.log('LeetVision: Received message:', msg.type);
   
   // Handle all message types synchronously
   try {
     // Test message to verify content script is working
-    if (message.type === 'PING') {
+    if (msg.type === 'PING') {
       // Update popup check time for monitoring
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (typeof (window as any).leetvisionUpdatePopupCheck === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).leetvisionUpdatePopupCheck();
       }
       sendResponse({ success: true, message: 'Content script is working' });
       return true;
     }
-    if (message.type === 'SCAN_CODE') {
+    if (msg.type === 'SCAN_CODE') {
       const codeSections = detectCodeSections();
       sendResponse({ success: true, codeSections });
-    } else if (message.type === 'ENABLE_HOVER_MODE') {
+    } else if (msg.type === 'ENABLE_HOVER_MODE') {
       enableHoverMode();
       sendResponse({ success: true });
-    } else if (message.type === 'DISABLE_HOVER_MODE') {
+    } else if (msg.type === 'DISABLE_HOVER_MODE') {
       disableHoverMode();
       sendResponse({ success: true });
-    } else if (message.type === 'CHECK_HOVER_MODE') {
+    } else if (msg.type === 'CHECK_HOVER_MODE') {
       sendResponse({ isActive: isHoverActive() });
-    } else if (message.type === 'CLEAR_SELECTED_ELEMENT') {
+    } else if (msg.type === 'CLEAR_SELECTED_ELEMENT') {
       clearSelectedElement();
       sendResponse({ success: true });
-    } else if (message.type === 'SHOW_SELECTED_ELEMENT') {
+    } else if (msg.type === 'SHOW_SELECTED_ELEMENT') {
       showSelectedElement();
       sendResponse({ success: true });
-    } else if (message.type === 'HIDE_SELECTED_ELEMENT') {
+    } else if (msg.type === 'HIDE_SELECTED_ELEMENT') {
       hideSelectedElement();
       sendResponse({ success: true });
-    } else if (message.type === 'GET_CODE_HASH') {
+    } else if (msg.type === 'GET_CODE_HASH') {
       const codeSections = detectCodeSections();
       if (codeSections.length > 0) {
         const selectedSection = codeSections.find(
-          (section) => section.id === message.sectionId
+          (section) => section.id === msg.sectionId
         );
         if (selectedSection) {
           const hash = hashCode(selectedSection.content);
@@ -61,9 +64,9 @@ browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
       } else {
         sendResponse({ success: false, error: 'No code found' });
       }
-    } else if (message.type === 'HIGHLIGHT_CODE') {
+    } else if (msg.type === 'HIGHLIGHT_CODE') {
       sendResponse({ success: true });
-    } else if (message.type === 'REMOVE_HIGHLIGHT') {
+    } else if (msg.type === 'REMOVE_HIGHLIGHT') {
       sendResponse({ success: true });
     }
   } catch (error) {

@@ -21,25 +21,27 @@ browser.runtime.onConnect.addListener((port) => {
 });
 
 // Handle messages from content scripts and popup
-browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
-  if (message.type === 'CODE_CHANGED') {
+browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  const msg = message as { type: string; hash?: string; [key: string]: unknown };
+  
+  if (msg.type === 'CODE_CHANGED') {
     // Forward code change notification to popup if it's open
     browser.runtime.sendMessage({
       type: 'CODE_CHANGED',
-      hash: message.hash,
+      hash: msg.hash,
     }).catch(() => {
       // Popup might not be open, ignore error
     });
   }
 
-  if (message.type === 'GENERATE_RESPONSE') {
+  if (msg.type === 'GENERATE_RESPONSE') {
     // This is handled by the popup directly calling the Gemini API
     // Background worker could be used for API calls if needed for more complex scenarios
     sendResponse({ success: true });
   }
 
   // Handle OAuth callback from callback page
-  if (message.type === 'OAUTH_CALLBACK') {
+  if (msg.type === 'OAUTH_CALLBACK') {
     // Forward to all extension contexts (popup, etc.)
     browser.runtime.sendMessage(message).catch(() => {
       // Extension context might not be listening, store in storage as fallback

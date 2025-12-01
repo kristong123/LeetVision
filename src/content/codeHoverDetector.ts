@@ -6,7 +6,7 @@ let codeElements: HTMLElement[] = [];
 let selectedElement: HTMLElement | null = null;
 let tooltipElement: HTMLDivElement | null = null;
 let selectionIndicator: HTMLDivElement | null = null;
-let originalStyles: Map<HTMLElement, string> = new Map();
+const originalStyles: Map<HTMLElement, string> = new Map();
 
 /**
  * Create and show tooltip
@@ -329,21 +329,26 @@ function handleElementClick(this: HTMLElement, event: MouseEvent) {
     removeHighlightStyles(selectedElement);
   }
   
+  // Store element reference to avoid this-alias
+  // eslint-disable-next-line @typescript-eslint/no-this-alias
+  const element = this;
+  
   // Set new selected element
-  selectedElement = this;
+  selectedElement = element;
+  const targetElement = element;
   
   // Remove event listeners from this element to make it unclickable
-  this.removeEventListener('mouseenter', handleElementMouseEnter);
-  this.removeEventListener('mouseleave', handleElementMouseLeave);
-  this.removeEventListener('click', handleElementClick);
+  element.removeEventListener('mouseenter', handleElementMouseEnter);
+  element.removeEventListener('mouseleave', handleElementMouseLeave);
+  element.removeEventListener('click', handleElementClick);
   
   // Apply selected styling to this element
-  applyHighlightStyles(this, true);
+  applyHighlightStyles(element, true);
   
   // Auto-hide green highlight after 1 second (but keep selectedElement reference)
   setTimeout(() => {
-    if (selectedElement === this) {
-      removeHighlightStyles(this);
+    if (selectedElement === targetElement) {
+      removeHighlightStyles(targetElement);
       console.log('LeetVision: Auto-hiding selected element after 1 second');
     }
   }, 1000);
@@ -368,6 +373,7 @@ function handleElementClick(this: HTMLElement, event: MouseEvent) {
     }
   } else if (this.classList.contains('CodeMirror')) {
     // CodeMirror editor
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cmElement = this as any;
     if (cmElement.CodeMirror && cmElement.CodeMirror.getValue) {
       codeContent = cmElement.CodeMirror.getValue();
@@ -376,6 +382,7 @@ function handleElementClick(this: HTMLElement, event: MouseEvent) {
     }
   } else if (this.classList.contains('ace_editor')) {
     // ACE editor
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const aceElement = this as any;
     if (aceElement.env && aceElement.env.editor && aceElement.env.editor.getValue) {
       codeContent = aceElement.env.editor.getValue();
@@ -627,6 +634,7 @@ function findCodeElements(): HTMLElement[] {
  */
 function extractMonacoCode(element: HTMLElement): string {
   // Method 1: Try to access Monaco's editor instance API
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoElement = element as any;
   
   // Check for editor model API (most reliable)
@@ -640,6 +648,7 @@ function extractMonacoCode(element: HTMLElement): string {
   }
   
   // Method 2: Look for the parent container's editor instance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorWrapper = element.closest('[class*="editor"]') as any;
   if (editorWrapper) {
     // Check wrapper for editor instance
@@ -651,21 +660,24 @@ function extractMonacoCode(element: HTMLElement): string {
   // Method 3: Try to find Monaco editor instance globally
   // Monaco often exposes editors through window.monaco or data attributes
   const dataUri = element.getAttribute('data-uri');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (dataUri && (window as any).monaco) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const models = (window as any).monaco.editor.getModels();
       for (const model of models) {
         if (model.uri?.toString() === dataUri) {
           return model.getValue();
         }
       }
-    } catch (e) {
-      console.log('LeetVision: Could not access Monaco models', e);
+    } catch (_e) { // Removed unused catch variable 'e'
+      console.log('LeetVision: Could not access Monaco models', _e);
     }
   }
   
   // Method 4: Try to find Monaco editor through React fiber (LeetCode specific)
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reactFiber = (element as any)._reactInternalFiber || (element as any)._reactInternalInstance;
     if (reactFiber) {
       let current = reactFiber;
@@ -679,20 +691,22 @@ function extractMonacoCode(element: HTMLElement): string {
         current = current.child || current.sibling;
       }
     }
-  } catch (e) {
-    console.log('LeetVision: Could not access React fiber', e);
+  } catch (_e) { // Removed unused catch variable 'e'
+    console.log('LeetVision: Could not access React fiber', _e);
   }
   
   // Method 5: Try to find Monaco editor through data attributes
   const editorId = element.getAttribute('data-editor-id');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (editorId && (window as any).monaco) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const editor = (window as any).monaco.editor.getModelById?.(editorId);
       if (editor?.getValue) {
         return editor.getValue();
       }
-    } catch (e) {
-      console.log('LeetVision: Could not access Monaco editor by ID', e);
+    } catch (_e) { // Removed unused catch variable 'e'
+      console.log('LeetVision: Could not access Monaco editor by ID', _e);
     }
   }
   
@@ -726,6 +740,7 @@ function extractMonacoCode(element: HTMLElement): string {
  * Detect language from Monaco editor
  */
 function detectMonacoLanguage(element: HTMLElement): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoElement = element as any;
   
   // Try to get language from Monaco model

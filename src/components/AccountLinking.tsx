@@ -24,6 +24,8 @@ interface AccountLinkingData {
  * with an existing email/password account (or vice versa)
  */
 const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: AccountLinkingProps) => {
+  // googleUserId is passed but not used - parent passes it for future use
+  void googleUserId;
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +44,7 @@ const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: Acco
         pending_account_link?: AccountLinkingData;
       };
       const googleUser = stored.cognito_user;
-      const pendingLink = stored.pending_account_link as AccountLinkingData | undefined;
+      // const pendingLink = stored.pending_account_link as AccountLinkingData | undefined; // Unused
 
       if (!googleUser || !googleUser.idToken || !googleUser.uid) {
         throw new Error('Google account session not found. Please sign in with Google again.');
@@ -53,22 +55,23 @@ const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: Acco
       let emailUser;
       try {
         emailUser = await signInWithEmail(email, password);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const error = err as Error;
         // Handle specific authentication errors
-        if (err.message?.includes('UserNotFoundException')) {
+        if (error.message?.includes('UserNotFoundException')) {
           throw new Error(
             'Email account does not exist. ' +
             'Please sign up with email/password first, then you can link your Google account.'
           );
         }
-        if (err.message?.includes('NotAuthorizedException') || err.message?.includes('Invalid')) {
+        if (error.message?.includes('NotAuthorizedException') || error.message?.includes('Invalid')) {
           throw new Error('Invalid password. Please enter the correct password for your email account.');
         }
-        if (err.message?.includes('ACCOUNT_LINKING_NEEDED')) {
+        if (error.message?.includes('ACCOUNT_LINKING_NEEDED')) {
           // This shouldn't happen here, but handle it gracefully
           throw new Error('Account linking is already in progress. Please try again.');
         }
-        throw new Error(err.message || 'Failed to authenticate with email account');
+        throw new Error(error.message || 'Failed to authenticate with email account');
       }
 
       // Verify emails match before linking
@@ -87,18 +90,19 @@ const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: Acco
           'Google',
           googleUser.idToken
         );
-      } catch (linkErr: any) {
+      } catch (linkErr: unknown) {
+        const error = linkErr as Error;
         // Provide specific error messages for linking failures
-        if (linkErr.message?.includes('already linked') || linkErr.message?.includes('AliasExistsException')) {
+        if (error.message?.includes('already linked') || error.message?.includes('AliasExistsException')) {
           throw new Error('These accounts are already linked. You can sign in with either method.');
         }
-        if (linkErr.message?.includes('emails do not match')) {
+        if (error.message?.includes('emails do not match')) {
           throw new Error('Cannot link accounts: The email addresses do not match.');
         }
-        if (linkErr.message?.includes('not found')) {
+        if (error.message?.includes('not found')) {
           throw new Error('One of the accounts was not found. Please ensure both accounts exist.');
         }
-        throw new Error(linkErr.message || 'Failed to link accounts. Please try again.');
+        throw new Error(error.message || 'Failed to link accounts. Please try again.');
       }
 
       // Clear pending link info
@@ -112,9 +116,9 @@ const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: Acco
       });
 
       onLink();
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Provide user-friendly error messages
-      const errorMessage = err.message || 'Failed to link accounts';
+      const errorMessage = (err as Error).message || 'Failed to link accounts';
       onError(errorMessage);
     } finally {
       setLoading(false);

@@ -108,9 +108,10 @@ export const signInWithEmail = async (
 
         resolve(userData);
       },
-      onFailure: async (err: any) => {
+      onFailure: async (err: unknown) => {
+        const error = err as { code?: string; name?: string; message?: string };
         // Provide user-friendly error messages
-        const errorCode = err?.code || err?.name || '';
+        const errorCode = error?.code || error?.name || '';
         if (errorCode === 'UserNotConfirmedException') {
           // User exists but email is not verified - allow sign-in anyway
           // We'll authenticate them but they'll remain unverified
@@ -165,18 +166,19 @@ export const signUpWithEmail = async (
       }),
     ];
 
-    userPool.signUp(email, password, attributeList, [], (err: any, result) => {
-      if (err) {
+    userPool.signUp(email, password, attributeList, [], (err: unknown, result) => {
+      const error = err as { code?: string; name?: string; message?: string } | null;
+      if (error) {
         // Provide user-friendly error messages
-        const errorCode = err?.code || err?.name || '';
-        if (errorCode === 'UsernameExistsException' || err?.message?.includes('already exists')) {
+        const errorCode = error?.code || error?.name || '';
+        if (errorCode === 'UsernameExistsException' || error?.message?.includes('already exists')) {
           reject(new Error(
             'An account with this email already exists. ' +
             'If you signed up with Google, please use "Continue with Google" to sign in. ' +
             'Otherwise, use the "Sign In" option.'
           ));
         } else {
-        reject(err);
+        reject(error);
         }
         return;
       }
@@ -203,9 +205,10 @@ export const confirmSignUp = async (
       Pool: userPool,
     });
 
-    cognitoUser.confirmRegistration(code, true, (err: any) => {
-      if (err) {
-        const errorCode = err?.code || err?.name || '';
+    cognitoUser.confirmRegistration(code, true, (err: unknown) => {
+      const error = err as { code?: string; name?: string; message?: string } | null;
+      if (error) {
+        const errorCode = error?.code || error?.name || '';
         if (errorCode === 'CodeMismatchException' || errorCode === 'ExpiredCodeException') {
           reject(new Error(
             errorCode === 'ExpiredCodeException'
@@ -213,7 +216,7 @@ export const confirmSignUp = async (
               : 'Invalid verification code. Please check your email and try again.'
           ));
         } else {
-          reject(err);
+          reject(error);
         }
         return;
       }
@@ -234,13 +237,14 @@ export const resendConfirmationCode = async (
       Pool: userPool,
     });
 
-    cognitoUser.resendConfirmationCode((err: any) => {
-      if (err) {
-        const errorCode = err?.code || err?.name || '';
+    cognitoUser.resendConfirmationCode((err: unknown) => {
+      const error = err as { code?: string; name?: string; message?: string } | null;
+      if (error) {
+        const errorCode = error?.code || error?.name || '';
         if (errorCode === 'LimitExceededException') {
           reject(new Error('Too many requests. Please wait a few minutes before requesting another code.'));
         } else {
-          reject(err);
+          reject(error);
         }
         return;
       }
@@ -262,79 +266,76 @@ export const resendConfirmationCode = async (
  * Cognito → User Pool → App Integration → App clients → [Your Client] → Hosted UI → Allowed OAuth scopes
  */
 export const signInWithGoogle = async (): Promise<CognitoUserData> => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Validate required configuration
-      if (!COGNITO_DOMAIN) {
-        reject(new Error('Cognito domain is not configured. Please set VITE_COGNITO_DOMAIN in your .env file'));
-        return;
-      }
+  // Validate required configuration
+  if (!COGNITO_DOMAIN) {
+    throw new Error('Cognito domain is not configured. Please set VITE_COGNITO_DOMAIN in your .env file');
+  }
 
-      // Define required OAuth scopes (must match Cognito App Client configuration)
-      // These scopes must be space-separated: 'openid email profile'
-      const requiredScopes = ['openid', 'email', 'profile'];
-      const scopeString = requiredScopes.join(' ');
+  // Define required OAuth scopes (must match Cognito App Client configuration)
+  // These scopes must be space-separated: 'openid email profile'
+  const requiredScopes = ['openid', 'email', 'profile'];
+  const scopeString = requiredScopes.join(' ');
 
-      // Build OAuth URL with manual parameter encoding
-      // Note: We manually encode parameters to ensure proper formatting
-      // Cognito is sensitive to scope encoding - spaces should be encoded as %20, not +
-      // identity_provider should match the provider name configured in Cognito
-      // Try lowercase 'google' first as some Cognito configurations are case-sensitive
-      // If this fails, try without identity_provider parameter to show provider selection
-      const identityProvider = 'google'; // Try lowercase first (some Cognito configs are case-sensitive)
-      
-      const params = [
-        `client_id=${encodeURIComponent(CLIENT_ID)}`,
-        `response_type=${encodeURIComponent('code')}`,
-        `scope=${encodeURIComponent(scopeString)}`, // Encode scope with spaces as %20
-        `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
-        `identity_provider=${encodeURIComponent(identityProvider)}`, // Use lowercase 'google'
-      ].join('&');
+  // Build OAuth URL with manual parameter encoding
+  // Note: We manually encode parameters to ensure proper formatting
+  // Cognito is sensitive to scope encoding - spaces should be encoded as %20, not +
+  // identity_provider should match the provider name configured in Cognito
+  // Try lowercase 'google' first as some Cognito configurations are case-sensitive
+  // If this fails, try without identity_provider parameter to show provider selection
+  const identityProvider = 'google'; // Try lowercase first (some Cognito configs are case-sensitive)
+  
+  const params = [
+    `client_id=${encodeURIComponent(CLIENT_ID)}`,
+    `response_type=${encodeURIComponent('code')}`,
+    `scope=${encodeURIComponent(scopeString)}`, // Encode scope with spaces as %20
+    `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
+    `identity_provider=${encodeURIComponent(identityProvider)}`, // Use lowercase 'google'
+  ].join('&');
 
-      const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params}`;
-      
-      // Debug: log the URL and configuration
-      console.log('OAuth URL (should redirect to Google):', authUrl);
-      console.log('Redirect URI:', REDIRECT_URI);
-      console.log('Cognito Domain:', COGNITO_DOMAIN);
-      console.log('Requested scopes:', scopeString);
-      console.log('Identity provider:', identityProvider);
-      console.log('Scope parameter in URL:', authUrl.match(/scope=([^&]+)/)?.[1] || 'not found');
-      console.log('Expected flow: Cognito → Google → Cognito → Extension callback');
-      console.log('Note: If you see invalid_scope error, verify Cognito App Client has these scopes enabled: openid, email, profile');
-      
-      // Validate that the scope parameter is properly formatted
-      if (!authUrl.includes('scope=')) {
-        reject(new Error('Failed to construct OAuth URL with scope parameter'));
-        return;
-      }
-      
-      // Verify scope encoding (should have %20 for spaces, not +)
-      const scopeParam = authUrl.match(/scope=([^&]+)/)?.[1];
-      if (scopeParam && scopeParam.includes('+')) {
-        console.warn('Warning: Scope parameter contains + instead of %20. This may cause issues with Cognito.');
-      }
+  const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params}`;
+  
+  // Debug: log the URL and configuration
+  console.log('OAuth URL (should redirect to Google):', authUrl);
+  console.log('Redirect URI:', REDIRECT_URI);
+  console.log('Cognito Domain:', COGNITO_DOMAIN);
+  console.log('Requested scopes:', scopeString);
+  console.log('Identity provider:', identityProvider);
+  console.log('Scope parameter in URL:', authUrl.match(/scope=([^&]+)/)?.[1] || 'not found');
+  console.log('Expected flow: Cognito → Google → Cognito → Extension callback');
+  console.log('Note: If you see invalid_scope error, verify Cognito App Client has these scopes enabled: openid, email, profile');
+  
+  // Validate that the scope parameter is properly formatted
+  if (!authUrl.includes('scope=')) {
+    throw new Error('Failed to construct OAuth URL with scope parameter');
+  }
+  
+  // Verify scope encoding (should have %20 for spaces, not +)
+  const scopeParam = authUrl.match(/scope=([^&]+)/)?.[1];
+  if (scopeParam && scopeParam.includes('+')) {
+    console.warn('Warning: Scope parameter contains + instead of %20. This may cause issues with Cognito.');
+  }
 
-      // Store pending auth state
-      await browser.storage.local.set({ oauth_pending: true });
+  // Store pending auth state
+  await browser.storage.local.set({ oauth_pending: true });
 
-      // Store tab ID for cleanup
-      let oauthTabId: number | undefined;
-      let storageInterval: NodeJS.Timeout;
+  return new Promise((resolve, reject) => {
+    let tabId: number | undefined;
+    let interval: NodeJS.Timeout | undefined;
 
-      // Listen for storage changes (callback page will update storage)
-      const storageListener = (changes: { [key: string]: any }) => {
+    // Listen for storage changes (callback page will update storage)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const storageListener = (changes: { [key: string]: any }) => {
         if (changes.oauth_result) {
           const result = changes.oauth_result.newValue;
           browser.storage.onChanged.removeListener(storageListener);
-          if (storageInterval) {
-            clearInterval(storageInterval);
+          if (interval) {
+            clearInterval(interval);
           }
           browser.storage.local.remove(['oauth_pending', 'oauth_result']).catch(() => {});
           
           // Close the OAuth tab if we have the tab ID
-          if (oauthTabId) {
-            browser.tabs.remove(oauthTabId).catch(() => {});
+          if (tabId) {
+            browser.tabs.remove(tabId).catch(() => {});
           }
           
           if (result?.error) {
@@ -374,8 +375,8 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
       const checkStorage = async () => {
         const stored = await browser.storage.local.get('oauth_result');
         if (stored.oauth_result) {
-          if (storageInterval) {
-            clearInterval(storageInterval);
+          if (storageCheckInterval) {
+            clearInterval(storageCheckInterval);
           }
           browser.storage.onChanged.removeListener(storageListener);
           storageListener({ oauth_result: { newValue: stored.oauth_result } });
@@ -383,33 +384,30 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
       };
       
       // Check storage periodically
-      storageInterval = setInterval(() => {
+      const storageCheckInterval = setInterval(() => {
         checkStorage();
       }, 500);
 
-      // Open OAuth URL in new tab
-      const tab = await browser.tabs.create({
+      // Open OAuth URLin new tab
+      browser.tabs.create({
         url: authUrl,
         active: true,
+      }).then((tab) => {
+        // Store tab ID to close it later
+        tabId = tab.id;
+
+        // Set timeout to reject if no response
+        setTimeout(() => {
+          browser.storage.onChanged.removeListener(storageListener);
+          clearInterval(storageCheckInterval);
+          browser.storage.local.remove(['oauth_pending', 'oauth_result']).catch(() => {});
+          if (tab.id) {
+            browser.tabs.remove(tab.id).catch(() => {});
+          }
+          reject(new Error('OAuth flow timed out'));
+        }, 5 * 60 * 1000); // 5 minute timeout
       });
-
-      // Store tab ID to close it later
-      oauthTabId = tab.id;
-
-      // Set timeout to reject if no response
-      setTimeout(() => {
-        browser.storage.onChanged.removeListener(storageListener);
-        clearInterval(storageInterval);
-        browser.storage.local.remove(['oauth_pending', 'oauth_result']).catch(() => {});
-        if (tab.id) {
-          browser.tabs.remove(tab.id).catch(() => {});
-        }
-        reject(new Error('OAuth flow timed out'));
-      }, 5 * 60 * 1000); // 5 minute timeout
-    } catch (err) {
-      reject(err);
-    }
-  });
+    });
 };
 
 /**
@@ -454,7 +452,7 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
         }
         
         console.error('Token exchange error:', errorData);
-      } catch (e) {
+      } catch {
         // If we can't parse the error response, use the status text
         errorMessage = `Token exchange failed with status ${response.status}: ${response.statusText}`;
       }
@@ -484,6 +482,7 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
     // and if the username format suggests it's a federated user
     const isFederatedUser = payload.identities && payload.identities.length > 0;
     const isGoogleUser = isFederatedUser && 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       payload.identities.some((id: any) => id.providerName === 'Google' || id.providerName === 'google');
     
     // Store account linking metadata if this is a Google user
@@ -505,12 +504,13 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
   });
 
   return userData;
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     // Re-throw with additional context if it's not already an Error
-    if (err instanceof Error) {
-      throw err;
+    if (error instanceof Error) {
+      throw error;
     }
-    throw new Error(`Token exchange failed: ${err?.message || String(err)}`);
+    throw new Error(`Token exchange failed: ${String(err)}`);
   }
 }
 
@@ -524,7 +524,7 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
  * Note: This is a placeholder - actual checking happens through sign-in attempts
  * and conflict detection
  */
-export const checkAccountExists = async (_email: string): Promise<{ exists: boolean; userId?: string }> => {
+export const checkAccountExists = async (): Promise<{ exists:boolean; userId?: string }> => {
   // We can't directly query Cognito from the client without admin permissions
   // Account existence is detected through sign-in failures and conflict detection
   return { exists: false };
@@ -587,7 +587,7 @@ export const linkAccounts = async (
       } else if (response.status === 500) {
         errorMessage = 'Server error during account linking. Please try again later.';
       }
-    } catch (e) {
+    } catch {
       // If we can't parse the error, use the status text
       errorMessage = `Account linking failed: ${response.status} ${response.statusText}`;
     }
@@ -608,8 +608,6 @@ export const linkAccounts = async (
  * and we check for pending_account_link in storage
  */
 export const checkAccountLinkingNeeded = async (
-  _googleUserEmail: string,
-  _googleUserId: string
 ): Promise<{ needsLinking: boolean; existingUserId?: string }> => {
   // Conflict detection is handled in signInWithEmail's error handler
   // which checks for pending_account_link when email sign-in fails
@@ -652,15 +650,17 @@ export const getCurrentUser = async (): Promise<CognitoUserData | null> => {
       return;
     }
 
-    cognitoUser.getSession((err: Error | null, session: any) => {
-      if (err || !session || !session.isValid()) {
+    cognitoUser.getSession((err: Error | null, session: unknown) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sess = session as any;
+      if (err || !sess || !sess.isValid()) {
         resolve(null);
         return;
       }
 
-      const idToken = session.getIdToken().getJwtToken();
-      const accessToken = session.getAccessToken().getJwtToken();
-      const payload = session.getIdToken().payload;
+      const idToken = sess.getIdToken().getJwtToken();
+      const accessToken = sess.getAccessToken().getJwtToken();
+      const payload = sess.getIdToken().payload;
 
       const userData: CognitoUserData = {
         uid: payload.sub,
@@ -693,6 +693,7 @@ export const onAuthChange = (
   getCurrentUser().then(callback);
 
   // Listen for storage changes (when user signs in/out in another tab)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const listener = (changes: { [key: string]: any }) => {
     if (changes.cognito_user) {
       callback(changes.cognito_user.newValue || null);

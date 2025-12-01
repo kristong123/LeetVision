@@ -67,12 +67,14 @@ const extractCodeContent = (element: HTMLElement): string => {
     }
   } else if (element.classList.contains('CodeMirror')) {
     // CodeMirror editor
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cmElement = element as any;
     if (cmElement.CodeMirror && cmElement.CodeMirror.getValue) {
       return cmElement.CodeMirror.getValue();
     }
   } else if (element.classList.contains('ace_editor')) {
     // ACE editor
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const aceElement = element as any;
     if (aceElement.env && aceElement.env.editor && aceElement.env.editor.getValue) {
       return aceElement.env.editor.getValue();
@@ -86,6 +88,7 @@ const extractCodeContent = (element: HTMLElement): string => {
 // Extract Monaco editor code using multiple methods
 const extractMonacoCode = (element: HTMLElement): string => {
   // Method 1: Try to access Monaco's editor instance API
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoElement = element as any;
   
   // Check for editor model API (most reliable)
@@ -99,6 +102,7 @@ const extractMonacoCode = (element: HTMLElement): string => {
   }
   
   // Method 2: Look for the parent container's editor instance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorWrapper = element.closest('[class*="editor"]') as any;
   if (editorWrapper) {
     // Check wrapper for editor instance
@@ -110,8 +114,10 @@ const extractMonacoCode = (element: HTMLElement): string => {
   // Method 3: Try to find Monaco editor instance globally
   // Monaco often exposes editors through window.monaco or data attributes
   const dataUri = element.getAttribute('data-uri');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (dataUri && (window as any).monaco) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const models = (window as any).monaco.editor.getModels();
       for (const model of models) {
         if (model.uri?.toString() === dataUri) {
@@ -125,6 +131,7 @@ const extractMonacoCode = (element: HTMLElement): string => {
   
   // Method 4: Try to find Monaco editor through React fiber (LeetCode specific)
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reactFiber = (element as any)._reactInternalFiber || (element as any)._reactInternalInstance;
     if (reactFiber) {
       let current = reactFiber;
@@ -144,8 +151,10 @@ const extractMonacoCode = (element: HTMLElement): string => {
   
   // Method 5: Try to find Monaco editor through data attributes
   const editorId = element.getAttribute('data-editor-id');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (editorId && (window as any).monaco) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const editor = (window as any).monaco.editor.getModelById?.(editorId);
       if (editor?.getValue) {
         return editor.getValue();
@@ -194,6 +203,7 @@ const detectLanguage = (element: HTMLElement): string => {
   
   // For Monaco editors, try to get language from Monaco model
   if (element.classList.contains('monaco-editor')) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const monacoElement = element as any;
     
     // Try to get language from Monaco model

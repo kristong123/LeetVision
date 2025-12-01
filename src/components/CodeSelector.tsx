@@ -17,7 +17,7 @@ const CodeSelector = () => {
       console.log('Hover mode already active, ignoring click');
       return;
     }
-    
+
     try {
       const [tab] = await browser.tabs.query({
         active: true,
@@ -45,7 +45,7 @@ const CodeSelector = () => {
           window.close();
         }).catch(async (error) => {
           console.error('Error with content script:', error);
-          
+
           // If content script doesn't exist, try to inject it
           if (error.message?.includes('Receiving end does not exist')) {
             try {
@@ -54,14 +54,14 @@ const CodeSelector = () => {
                 target: { tabId: tab.id! },
                 files: ['assets/contentScript.ts-C0eL4d_4.js']
               });
-              
+
               // Wait a moment for the script to load, then try again
               setTimeout(async () => {
                 try {
                   // Test ping first
                   await browser.tabs.sendMessage(tab.id!, { type: 'PING' });
                   console.log('Content script injected successfully');
-                  
+
                   // Now enable hover mode
                   await browser.tabs.sendMessage(tab.id!, {
                     type: 'ENABLE_HOVER_MODE',
@@ -89,10 +89,11 @@ const CodeSelector = () => {
         });
         dispatch(setHoverModeActive(false));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       console.error('Error toggling hover mode:', error);
-      
-      if (error.message?.includes('Receiving end does not exist')) {
+
+      if (err.message?.includes('Receiving end does not exist')) {
         alert('Please refresh the page first.\n\nThe extension needs to be initialized on the page.');
       } else {
         alert('Failed to activate hover mode. Make sure the page has loaded completely and try refreshing it.');
@@ -102,29 +103,30 @@ const CodeSelector = () => {
 
   // Listen for CODE_SELECTED and HOVER_MODE_DISABLED messages from content script
   useEffect(() => {
-    const handleMessage = (message: any) => {
-      if (message.type === 'CODE_SELECTED') {
+    const handleMessage = (message: unknown) => {
+      const msg = message as { type: string; code?: string; language?: string };
+      if (msg.type === 'CODE_SELECTED') {
         console.log('Code selected:', message);
         // Create a code section from the selected code
         const codeSection = {
           id: `hover-${Date.now()}`,
-          content: message.code,
-          language: message.language,
+          content: msg.code || '',
+          language: msg.language || 'plaintext',
         };
         dispatch(setCodeSections([codeSection]));
         dispatch(setSelectedCodeSection(codeSection.id));
         // Disable hover mode immediately when code is selected
         dispatch(setHoverModeActive(false));
       }
-      
-      if (message.type === 'HOVER_MODE_DISABLED') {
+
+      if (msg.type === 'HOVER_MODE_DISABLED') {
         // Update state when hover mode is disabled
         dispatch(setHoverModeActive(false));
       }
     };
 
     browser.runtime.onMessage.addListener(handleMessage);
-    
+
     return () => {
       browser.runtime.onMessage.removeListener(handleMessage);
     };
@@ -145,14 +147,14 @@ const CodeSelector = () => {
 
           if (tab?.id) {
             try {
-              const response: any = await browser.tabs.sendMessage(tab.id, {
+              const response = await browser.tabs.sendMessage(tab.id, {
                 type: 'CHECK_HOVER_MODE',
-              });
-              
+              }) as { isActive?: boolean };
+
               if (response && !response.isActive) {
                 dispatch(setHoverModeActive(false));
               }
-            } catch (msgError) {
+            } catch {
               // Message channel closed or content script not ready
               // Assume hover mode is off
               console.log('Could not check hover mode status, assuming off');
@@ -174,11 +176,10 @@ const CodeSelector = () => {
       <button
         onClick={toggleHoverMode}
         disabled={isLoading || hoverModeActive}
-        className={`w-full py-2 px-4 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          hoverModeActive
-            ? 'bg-green-600 text-white'
-            : 'bg-gray-800 dark:bg-gray-600 text-white hover:bg-gray-700 dark:hover:bg-gray-500'
-        }`}
+        className={`w-full py-2 px-4 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${hoverModeActive
+          ? 'bg-green-600 text-white'
+          : 'bg-gray-800 dark:bg-gray-600 text-white hover:bg-gray-700 dark:hover:bg-gray-500'
+          }`}
       >
         {hoverModeActive ? (
           <>
@@ -216,7 +217,7 @@ const CodeSelector = () => {
               <Eye className="w-5 h-5 text-green-700 dark:text-green-300" />
             </button>
           </div>
-          
+
           {showCodePreview && (
             <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto">
               <pre className="text-xs text-gray-900 dark:text-gray-100 whitespace-pre-wrap font-mono">

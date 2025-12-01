@@ -43,7 +43,7 @@ function App() {
 
     // Load selected code first, then restore other state
     browser.storage.local.get('leetvision_selected_code').then((result) => {
-      const selectedCode: any = result.leetvision_selected_code;
+      const selectedCode = result.leetvision_selected_code as { code: string; language?: string; source?: string } | undefined;
 
       return restoreState().then((savedState) => {
         if (savedState) {

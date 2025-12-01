@@ -8,7 +8,7 @@ const initialState: UserState = {
     theme: 'dark',
     displayMode: 'floating',
     selectedMode: 'learn',
-    responseLength: 3,
+    responseLength: 1,
   },
 };
 

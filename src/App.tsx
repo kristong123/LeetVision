@@ -24,34 +24,34 @@ function App() {
   useEffect(() => {
     // Establish connection with background script for popup closure detection
     browser.runtime.connect();
-    
+
     // Always cancel hover mode when popup opens
     browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab?.id) {
         browser.tabs.sendMessage(tab.id, { type: 'DISABLE_HOVER_MODE' }).catch(() => {
           // Content script might not be ready, ignore
         });
-        
+
         // Show selected element if any (popup is now open)
         browser.tabs.sendMessage(tab.id, { type: 'SHOW_SELECTED_ELEMENT' }).catch(() => {
           // Content script might not be ready, ignore
         });
       }
     });
-    
+
     // No cleanup needed - background script handles popup disconnection
-    
+
     // Load selected code first, then restore other state
     browser.storage.local.get('leetvision_selected_code').then((result) => {
       const selectedCode: any = result.leetvision_selected_code;
-      
+
       return restoreState().then((savedState) => {
         if (savedState) {
           // If we have selected code in storage, merge it into the restored state
           if (selectedCode && selectedCode.code) {
             browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
               const isSamePage = tab?.url && selectedCode.source === tab.url;
-              
+
               if (isSamePage) {
                 // Merge selected code into restored state
                 const codeSection = {
@@ -59,12 +59,12 @@ function App() {
                   content: selectedCode.code,
                   language: selectedCode.language || 'plaintext',
                 };
-                
+
                 savedState.codeSections = [codeSection];
                 savedState.selectedCodeSection = codeSection.id;
                 savedState.hoverModeActive = false;
               }
-              
+
               dispatch(restoreAppState(savedState));
             });
           } else {
@@ -79,13 +79,13 @@ function App() {
       dispatch(setPreferences(prefs));
       dispatch(setMode(prefs.selectedMode));
       dispatch(setResponseLength(prefs.responseLength));
-      
-      // Apply theme
+
+      // Apply theme - ensure clean state first
+      document.documentElement.classList.remove('dark');
       if (prefs.theme === 'dark') {
         document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
       }
+      // For light theme, no class needed - absence of 'dark' class means light theme
     });
 
     // Listen for auth changes
@@ -109,11 +109,12 @@ function App() {
   // Watch for theme changes and apply them dynamically
   const preferences = useAppSelector((state) => state.user.preferences);
   useEffect(() => {
+    // Ensure clean state - remove dark class first, then add if needed
+    document.documentElement.classList.remove('dark');
     if (preferences.theme === 'dark') {
       document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
     }
+    // For light theme, no class needed - absence of 'dark' class means light theme
   }, [preferences.theme]);
 
   // Save state whenever appState changes
@@ -127,7 +128,7 @@ function App() {
   }, [appState]);
 
   return (
-    <div className="w-[400px] h-fit p-3 flex flex-col bg-white dark:bg-gray-900" style={{ overscrollBehavior: 'none' }}>
+    <div className="w-[400px] h-fit p-3 flex flex-col bg-vscode-bg text-vscode-text animate-fade-in transition-theme duration-300 font-sans" style={{ overscrollBehavior: 'none' }}>
       <Header
         onSettingsClick={() => setShowSettings(true)}
         onAuthClick={() => setShowAuth(true)}

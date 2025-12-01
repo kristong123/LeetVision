@@ -24,12 +24,12 @@ const Settings = ({ onClose }: SettingsProps) => {
     const newTheme = e.target.value as 'light' | 'dark';
     dispatch(setPreferences({ theme: newTheme }));
     savePreferences({ theme: newTheme });
-    
-    // Apply theme to document (also handled by useEffect in App.tsx, but applying here for immediate feedback)
+
+    // Apply theme to document immediately (also handled by useEffect in App.tsx)
+    // Force remove dark class first, then add if needed
+    document.documentElement.classList.remove('dark');
     if (newTheme === 'dark') {
       document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
     }
   };
 
@@ -41,30 +41,30 @@ const Settings = ({ onClose }: SettingsProps) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-vscode-bg rounded-lg w-full max-w-md mx-4 shadow-2xl border border-vscode-border">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-vscode-border bg-vscode-activity rounded-t-lg">
+          <h2 className="text-sm font-bold text-vscode-text uppercase tracking-wide">
             Settings
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-vscode-text hover:text-white transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4">
           {/* Theme Selector */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-sm text-vscode-text">
               Theme
             </span>
             <select
               value={preferences.theme}
               onChange={handleThemeChange}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-2 py-1 border border-vscode-border bg-vscode-input text-vscode-text text-sm focus:outline-none focus:border-vscode-blue rounded-lg"
             >
               <option value="dark">Dark</option>
               <option value="light">Light</option>
@@ -73,20 +73,19 @@ const Settings = ({ onClose }: SettingsProps) => {
 
           {/* Display Mode Toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-sm text-vscode-text">
               Display Mode
             </span>
-            <div className="flex gap-2">
+            <div className="flex gap-1 bg-vscode-input p-0.5 rounded-lg">
               <button
                 onClick={() => {
                   dispatch(setPreferences({ displayMode: 'floating' }));
                   savePreferences({ displayMode: 'floating' });
                 }}
-                className={`px-3 py-1 rounded text-xs ${
-                  preferences.displayMode === 'floating'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
+                className={`px-3 py-1 text-xs transition-colors rounded-md ${preferences.displayMode === 'floating'
+                  ? 'bg-vscode-button text-white'
+                  : 'text-vscode-text hover:bg-vscode-list-hover'
+                  }`}
               >
                 Floating
               </button>
@@ -95,11 +94,10 @@ const Settings = ({ onClose }: SettingsProps) => {
                   dispatch(setPreferences({ displayMode: 'sidebar' }));
                   savePreferences({ displayMode: 'sidebar' });
                 }}
-                className={`px-3 py-1 rounded text-xs ${
-                  preferences.displayMode === 'sidebar'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
+                className={`px-3 py-1 text-xs transition-colors rounded-md ${preferences.displayMode === 'sidebar'
+                  ? 'bg-vscode-button text-white'
+                  : 'text-vscode-text hover:bg-vscode-list-hover'
+                  }`}
               >
                 Sidebar
               </button>
@@ -108,7 +106,7 @@ const Settings = ({ onClose }: SettingsProps) => {
 
           {/* API Key Input */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="block text-sm text-vscode-text">
               Gemini API Key
             </label>
             <div className="flex gap-2">
@@ -118,29 +116,29 @@ const Settings = ({ onClose }: SettingsProps) => {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="Enter your API key"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-1.5 border border-vscode-border bg-vscode-input text-vscode-text text-sm focus:outline-none focus:border-vscode-blue placeholder-vscode-description font-mono rounded-lg"
                 />
                 <button
                   onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="absolute right-2 top-1.5 text-vscode-description hover:text-vscode-text"
                 >
                   {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               <button
                 onClick={handleApiKeySave}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
+                className="px-3 py-1.5 bg-vscode-button text-white hover:bg-vscode-button-hover text-sm transition-colors rounded-lg"
               >
                 Save
               </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-vscode-description">
               Get your free API key from{' '}
               <a
                 href="https://aistudio.google.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
+                className="text-vscode-blue hover:underline"
               >
                 Google AI Studio
               </a>

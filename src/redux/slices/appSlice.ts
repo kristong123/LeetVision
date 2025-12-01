@@ -3,7 +3,7 @@ import { AppState, Mode, Message, CodeSection } from '../../types';
 
 const initialState: AppState = {
   mode: 'learn',
-  responseLength: 3,
+  responseLength: 1,
   messages: [],
   isLoading: false,
   error: null,

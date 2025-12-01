@@ -14,46 +14,44 @@ const ChatBox = () => {
   if (messages.length === 0 && !isLoading) {
     return (
       <div className="flex items-center justify-center px-4 py-8">
-        <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
-          {codeSections.length === 0 
-            ? "Select code on the page to get started"
-            : "Ask a question or use quick actions"}
+        <p className="text-vscode-description text-center text-xs font-mono">
+          {codeSections.length === 0
+            ? "// Select code to start..."
+            : "// Ready to assist..."}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="px-4 py-3 space-y-3 max-h-64 overflow-y-auto">
+    <div className="px-4 py-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar font-mono text-sm">
       {messages.map((message) => (
         <div
           key={message.id}
-          className={`flex ${
-            message.role === 'user' ? 'justify-end' : 'justify-start'
-          }`}
+          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'
+            } animate-slide-up`}
         >
           <div
-            className={`rounded-lg px-4 py-2 ${
-              message.role === 'user'
-                ? 'max-w-[80%] bg-blue-500 text-white'
-                : 'w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-            }`}
+            className={`rounded-lg px-3 py-1.5 max-w-[90%] ${message.role === 'user'
+              ? 'bg-vscode-blue/20 text-vscode-text border border-vscode-blue/30'
+              : 'bg-vscode-widget text-vscode-text border border-vscode-border'
+              }`}
           >
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
         </div>
       ))}
       {isLoading && (
-        <div className="flex justify-start">
-          <div className="w-fit rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-700">
+        <div className="flex justify-start animate-fade-in">
+          <div className="w-fit rounded-lg px-3 py-1.5 bg-vscode-widget border border-vscode-border">
             <div className="flex gap-1">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-vscode-text/50 rounded-full animate-bounce"></div>
               <div
-                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                className="w-1.5 h-1.5 bg-vscode-text/50 rounded-full animate-bounce"
                 style={{ animationDelay: '0.1s' }}
               ></div>
               <div
-                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                className="w-1.5 h-1.5 bg-vscode-text/50 rounded-full animate-bounce"
                 style={{ animationDelay: '0.2s' }}
               ></div>
             </div>

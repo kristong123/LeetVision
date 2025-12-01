@@ -47,7 +47,14 @@ export const generateResponse = async ({
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to generate response');
+      const errorMessage = errorData.error || 'Failed to generate response';
+      
+      // Check for quota/token limit errors
+      if (response.status === 429 || errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('rate limit')) {
+        throw new Error('QUOTA_EXCEEDED: You have reached the usage limit. Please add your own API key in Settings to continue.');
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

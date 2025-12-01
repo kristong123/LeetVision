@@ -12,32 +12,32 @@ const Header = ({ onSettingsClick, onAuthClick }: HeaderProps) => {
   const [showDropdown, setShowDropdown] = useState(false);
 
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-      <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+    <header className="flex items-center justify-between px-4 py-2 border-b border-vscode-border bg-vscode-activity sticky top-0 z-10">
+      <h1 className="text-sm font-bold text-vscode-text uppercase tracking-wide">
         LeetVision
       </h1>
       <div className="relative">
         <button
           onClick={() => setShowDropdown(!showDropdown)}
-          className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          className="w-7 h-7 rounded-lg hover:bg-vscode-list-hover flex items-center justify-center transition-colors duration-100"
         >
           {isAuthenticated && user?.displayName ? (
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <span className="text-xs font-medium text-vscode-text">
               {user.displayName.charAt(0).toUpperCase()}
             </span>
           ) : (
-            <User className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            <User className="w-4 h-4 text-vscode-text" />
           )}
         </button>
 
         {showDropdown && (
-          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+          <div className="absolute right-0 mt-1 w-48 bg-vscode-widget rounded-lg shadow-xl border border-vscode-border z-10 animate-fade-in">
             <button
               onClick={() => {
                 onAuthClick();
                 setShowDropdown(false);
               }}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
+              className="w-full px-4 py-2 text-left text-sm text-vscode-text hover:bg-vscode-list-hover transition-colors rounded-t-lg"
             >
               {isAuthenticated ? 'Sign Out' : 'Sign In / Sign Up'}
             </button>
@@ -46,7 +46,7 @@ const Header = ({ onSettingsClick, onAuthClick }: HeaderProps) => {
                 onSettingsClick();
                 setShowDropdown(false);
               }}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg"
+              className="w-full px-4 py-2 text-left text-sm text-vscode-text hover:bg-vscode-list-hover transition-colors rounded-b-lg"
             >
               Settings
             </button>

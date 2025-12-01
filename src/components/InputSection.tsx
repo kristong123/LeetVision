@@ -100,12 +100,19 @@ const InputSection = () => {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to generate response';
+
+      // Check if it's a quota error
+      const isQuotaError = errorMessage.startsWith('QUOTA_EXCEEDED:');
+      const displayMessage = isQuotaError
+        ? errorMessage.replace('QUOTA_EXCEEDED: ', '')
+        : `Error: ${errorMessage}`;
+
       dispatch(setError(errorMessage));
       dispatch(
         addMessage({
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: `Error: ${errorMessage}`,
+          content: displayMessage + (isQuotaError ? '\n\n💡 Click the settings icon (top right) to add your own Gemini API key and continue chatting.' : ''),
           timestamp: Date.now(),
         })
       );
@@ -115,7 +122,7 @@ const InputSection = () => {
   };
 
   return (
-    <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+    <div className="px-4 py-3 border-t border-vscode-border bg-vscode-activity">
       <div className="flex gap-2 mb-2">
         <input
           type="text"
@@ -124,14 +131,14 @@ const InputSection = () => {
           onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
           placeholder={!hasCodeSelected ? "Select code first..." : "Ask anything..."}
           disabled={!hasCodeSelected || isLoading}
-          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 px-3 py-1.5 border border-vscode-input bg-vscode-input text-vscode-text placeholder-vscode-description focus:outline-none focus:border-vscode-blue focus:ring-1 focus:ring-vscode-blue disabled:opacity-50 text-sm font-mono rounded-lg"
         />
         <button
           onClick={() => handleSubmit()}
           disabled={!input.trim() || !hasCodeSelected || isLoading}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          className="px-3 py-1.5 bg-vscode-button text-white hover:bg-vscode-button-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-sm font-medium rounded-lg"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-3.5 h-3.5" />
           Send
         </button>
       </div>
@@ -141,12 +148,13 @@ const InputSection = () => {
         style={{
           backgroundColor:
             mode === 'learn'
-              ? '#059669'
+              ? '#4ec9b0' // VS Code Class
               : mode === 'explain'
-              ? '#2563eb'
-              : '#ea580c',
+                ? '#569cd6' // VS Code Keyword
+                : '#ea580c', // Orange
+          color: '#1e1e1e' // Dark text for contrast on these bright syntax colors
         }}
-        className="w-full py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white hover:opacity-90"
+        className="w-full py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 rounded-lg"
       >
         {quickActionButtons[mode]}
       </button>

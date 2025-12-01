@@ -222,7 +222,7 @@ const Auth = ({ onClose }: AuthProps) => {
           </div>
 
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            We've sent a verification code to <strong>{pendingEmail}</strong>. 
+            We've sent a verification code to <strong>{pendingEmail}</strong>.
             Please enter the code below to verify your email address.
           </p>
 

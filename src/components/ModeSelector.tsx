@@ -5,9 +5,9 @@ import { setPreferences } from '../redux/slices/userSlice';
 import { savePreferences } from '../utils/storage';
 
 const modes: { value: Mode; label: string; color: string }[] = [
-  { value: 'learn', label: 'Learn Mode', color: '#059669' },
-  { value: 'explain', label: 'Explain Mode', color: '#2563eb' },
-  { value: 'improve', label: 'Improve Mode', color: '#ea580c' },
+  { value: 'learn', label: 'Learn', color: '#4ec9b0' },
+  { value: 'explain', label: 'Explain', color: '#569cd6' },
+  { value: 'improve', label: 'Improve', color: '#dcdcaa' },
 ];
 
 const ModeSelector = () => {
@@ -17,11 +17,11 @@ const ModeSelector = () => {
   const hasCode = codeSections.length > 0;
 
   return (
-    <div className="px-4 py-3">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+    <div className="px-4 py-2">
+      <label className="block text-xs font-medium text-vscode-description mb-1 uppercase tracking-wider">
         Mode
       </label>
-      <div className="flex gap-2">
+      <div className="flex gap-1 bg-vscode-widget p-1 rounded-lg">
         {modes.map((mode) => (
           <button
             key={mode.value}
@@ -34,13 +34,13 @@ const ModeSelector = () => {
             }}
             disabled={!hasCode}
             style={{
-              backgroundColor: currentMode === mode.value ? mode.color : undefined,
+              color: currentMode === mode.value ? '#ffffff' : undefined,
+              borderColor: currentMode === mode.value ? mode.color : 'transparent',
             }}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-              currentMode === mode.value
-                ? 'text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            } ${!hasCode ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`flex-1 py-1 px-2 text-xs font-medium transition-all duration-100 border-b-2 rounded-md ${currentMode === mode.value
+              ? 'bg-vscode-list-hover'
+              : 'text-vscode-text hover:bg-vscode-list-hover'
+              } ${!hasCode ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {mode.label}
           </button>

@@ -103,14 +103,14 @@ const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: Acco
 
       // Clear pending link info
       await browser.storage.local.remove('pending_account_link');
-      
+
       // Update stored user to use the email account (which now has Google linked)
       await browser.storage.local.set({
         cognito_user: emailUser,
         cognito_id_token: emailUser.idToken,
         cognito_access_token: emailUser.accessToken,
       });
-      
+
       onLink();
     } catch (err: any) {
       // Provide user-friendly error messages
@@ -141,7 +141,7 @@ const AccountLinking = ({ email, googleUserId, onLink, onCancel, onError }: Acco
             We found a Google account and an email account both using <strong>{email}</strong>.
             Would you like to link them so you can sign in with either method?
           </p>
-          
+
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
             <p className="text-xs text-blue-800 dark:text-blue-200">
               <strong>What this means:</strong> After linking, you'll be able to sign in using

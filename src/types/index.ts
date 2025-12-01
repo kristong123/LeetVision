@@ -23,7 +23,7 @@ export interface UserPreferences {
   theme: Theme;
   displayMode: DisplayMode;
   selectedMode: Mode;
-  responseLength: number; // 1-5 sentences
+  responseLength: number; // 1-3 sentences
   geminiApiKey?: string;
 }
 

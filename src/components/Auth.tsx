@@ -11,6 +11,7 @@ import { useAppSelector, useAppDispatch } from '../redux/hooks';
 import { setUser } from '../redux/slices/userSlice';
 import browser from 'webextension-polyfill';
 import AccountLinking from './AccountLinking';
+import SetPassword from './SetPassword';
 import { X } from 'lucide-react';
 
 interface AuthProps {
@@ -26,6 +27,7 @@ const Auth = ({ onClose }: AuthProps) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAccountLinking, setShowAccountLinking] = useState(false);
+  const [showSetPassword, setShowSetPassword] = useState(false);
   const [accountLinkingData, setAccountLinkingData] = useState<{
     email: string;
     googleUserId: string;
@@ -94,23 +96,84 @@ const Auth = ({ onClose }: AuthProps) => {
     }
   };
 
-  const handleGoogleAuth = async () => {
+  // Check for pending password set intent after login
+  // We check this in a useEffect or similar, but since we have onClose that usually unmounts this,
+  // we might need to handle it before closing, or if the component stays mounted (it seems it renders conditional UI)
+
+  // Actually, we need to persist the intent across the Google OAuth redirect?
+  // Since we are an extension, the popup might close/reopen.
+  // We should check storage for 'pending_set_password_email'.
+
+  // Let's add an effect to check for this intent on mount/update
+  // Only if authenticated
+  /*
+  useEffect(() => {
+    if (isAuthenticated) {
+      browser.storage.local.get('pending_set_password_email').then((res) => {
+        if (res.pending_set_password_email) {
+          // Check if it matches current user? Or just offer it.
+          // Better to verify email matches to avoid confusion
+          // But user object might not be fully loaded or email might be null in some weird cases
+          // Assuming user is loaded from Redux
+          
+           // Logic handled in render or a separate check function called after auth
+        }
+      });
+    }
+  }, [isAuthenticated]);
+  */
+
+  // However, handleGoogleAuth closes the modal on success.
+  // We need to intercept that closure or re-open/show the SetPassword view.
+  // The Auth component is conditional.
+
+  // Let's modify handleGoogleAuth to NOT close immediately if we have this intent.
+
+  const handleGoogleAuth = async (isPasswordSetIntent = false) => {
     setError('');
     setLoading(true);
     setShowAccountLinking(false);
 
+    if (isPasswordSetIntent) {
+      await browser.storage.local.set({ password_set_intent: true });
+    }
+
     try {
       const userData = await signInWithGoogle();
-      // Update Redux state
+
       dispatch(setUser({
         uid: userData.uid,
         email: userData.email,
         displayName: userData.displayName,
       }));
-      onClose();
-      onClose();
+
+      // Check for password set intent
+      const stored = await browser.storage.local.get('password_set_intent');
+      if (stored.password_set_intent) {
+        await browser.storage.local.remove('password_set_intent');
+        setShowSetPassword(true);
+        // Do NOT close
+      } else {
+        onClose();
+      }
     } catch (err: unknown) {
-      setError((err as Error).message || 'Google sign-in failed');
+      const error = err as Error;
+
+      // Handle UNVERIFIED_USER from Google sign-in
+      if (error.message?.startsWith('UNVERIFIED_USER:')) {
+        try {
+          const unverifiedData = JSON.parse(error.message.replace('UNVERIFIED_USER:', ''));
+          setPendingEmail(unverifiedData.email);
+          // No password for Google sign in, but we need to verify email
+          setPendingPassword('');
+          setShowVerification(true);
+          setError('Please verify your email to continue.');
+        } catch {
+          setError(error.message || 'Google sign-in failed');
+        }
+      } else {
+        setError(error.message || 'Google sign-in failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -267,12 +330,6 @@ const Auth = ({ onClose }: AuthProps) => {
             >
               {resendingCode ? 'Sending...' : 'Resend verification code'}
             </button>
-            <button
-              onClick={handleSkipVerification}
-              className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              Skip for now (verify later)
-            </button>
           </div>
         </div>
       </div>
@@ -292,6 +349,16 @@ const Auth = ({ onClose }: AuthProps) => {
     );
   }
 
+  // Show set password UI if needed
+  if (showSetPassword) {
+    return (
+      <SetPassword
+        onClose={() => setShowSetPassword(false)}
+        onSuccess={() => setShowSetPassword(false)}
+      />
+    );
+  }
+
   if (isAuthenticated) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -307,13 +374,18 @@ const Auth = ({ onClose }: AuthProps) => {
               <X className="w-6 h-6" />
             </button>
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={loading}
-            className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Signing out...' : 'Sign Out'}
-          </button>
+
+          <div className="space-y-3">
+            {/* Set / Change Password button removed as requested */}
+
+            <button
+              onClick={handleLogout}
+              disabled={loading}
+              className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+            >
+              {loading ? 'Signing out...' : 'Sign Out'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -337,6 +409,16 @@ const Auth = ({ onClose }: AuthProps) => {
         {error && (
           <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded-lg text-sm">
             {error}
+            {error.includes('Continue with Google') && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleGoogleAuth(true)}
+                  className="text-blue-700 dark:text-blue-300 underline font-medium"
+                >
+                  Sign in with Google to create a password
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -390,7 +472,7 @@ const Auth = ({ onClose }: AuthProps) => {
           </div>
 
           <button
-            onClick={handleGoogleAuth}
+            onClick={() => handleGoogleAuth(false)}
             disabled={loading}
             className="mt-4 w-full py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
           >

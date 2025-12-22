@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from './redux/hooks';
 import { setUser, setPreferences } from './redux/slices/userSlice';
 import { setMode, setResponseLength, restoreAppState } from './redux/slices/appSlice';
-import { onAuthChange } from './services/cognito';
+import { onAuthChange, handlePendingOAuth } from './services/cognito';
 import { getPreferences } from './utils/storage';
 import { restoreState, saveState } from './utils/statePersistence';
 import browser from 'webextension-polyfill';
@@ -86,6 +86,21 @@ function App() {
         document.documentElement.classList.add('dark');
       }
       // For light theme, no class needed - absence of 'dark' class means light theme
+    });
+
+    // Check for pending OAuth flow (from Google Sign-in popup)
+    handlePendingOAuth().then((user) => {
+      if (user) {
+        dispatch(
+          setUser({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+          })
+        );
+      }
+    }).catch((err) => {
+      console.error('Pending OAuth failed:', err);
     });
 
     // Listen for auth changes

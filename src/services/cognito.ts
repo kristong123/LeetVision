@@ -389,6 +389,8 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
       }, 500);
 
       // Open OAuth URLin new tab
+      // Note: Opening a new tab usually closes the extension popup
+      // The state will be lost unless we handle it on mount
       browser.tabs.create({
         url: authUrl,
         active: true,
@@ -397,6 +399,7 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
         tabId = tab.id;
 
         // Set timeout to reject if no response
+        // Note: This timeout will likely only fire if the popup stays open (e.g. side panel)
         setTimeout(() => {
           browser.storage.onChanged.removeListener(storageListener);
           clearInterval(storageCheckInterval);
@@ -408,6 +411,55 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
         }, 5 * 60 * 1000); // 5 minute timeout
       });
     });
+};
+
+/**
+ * Handle pending OAuth flow (recovery from popup closure)
+ * This should be called when the app mounts
+ */
+export const handlePendingOAuth = async (): Promise<CognitoUserData | null> => {
+  try {
+    const stored = await browser.storage.local.get(['oauth_pending', 'oauth_result']);
+    const pendingData = stored as { 
+      oauth_pending?: boolean; 
+      oauth_result?: { 
+        code?: string; 
+        error?: string;
+        errorCode?: string;
+        errorDescription?: string;
+      } 
+    };
+    
+    // If no pending flow or no result yet, do nothing
+    if (!pendingData.oauth_pending || !pendingData.oauth_result) {
+      // If we've been pending for too long (e.g. user closed tab without finishing), 
+      // we might want to clear it? For now, let's rely on manual cleanup or timeouts.
+       
+      // Check if we have a stale pending state (older than 10 mins?)
+      // We could add timestamps to the storage set if needed.
+      return null;
+    }
+
+    const { oauth_result } = pendingData;
+    
+    // Clear pending state immediately to prevent loops
+    await browser.storage.local.remove(['oauth_pending', 'oauth_result']);
+
+    if (oauth_result.error) {
+      throw new Error(oauth_result.error);
+    }
+
+    if (oauth_result.code) {
+      return await exchangeCodeForTokens(oauth_result.code);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to handle pending OAuth:', error);
+    // Ensure cleanup
+    await browser.storage.local.remove(['oauth_pending', 'oauth_result']);
+    throw error;
+  }
 };
 
 /**
@@ -477,7 +529,7 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
     accessToken: access_token,
   };
 
-    // Check if this is a federated identity (Google) and if an email account might exist
+  // Check if this is a federated identity (Google) and if an email account might exist
     // We can detect this by checking if the identity provider is Google
     // and if the username format suggests it's a federated user
     const isFederatedUser = payload.identities && payload.identities.length > 0;
@@ -494,6 +546,26 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
           providerName: 'Google',
         },
       });
+    }
+
+    // Check email verification status
+    // Note: Google usually verifies emails, but we should enforce it
+    const isVerified = payload.email_verified === true || payload.email_verified === 'true';
+    if (!isVerified && userData.email) {
+       // Store tokens anyway so we can use them for resending code etc if needed, 
+       // but throw error to block full sign-in until verified
+       await browser.storage.local.set({
+        cognito_id_token: id_token,
+        cognito_access_token: access_token,
+        cognito_user: userData,
+      });
+
+      throw new Error(
+        'UNVERIFIED_USER:' + JSON.stringify({
+          email: userData.email,
+          message: 'Your email is not verified. Please verify your email to continue.'
+        })
+      );
     }
 
   // Store tokens in extension storage
@@ -706,6 +778,81 @@ export const onAuthChange = (
   return () => {
     browser.storage.onChanged.removeListener(listener);
   };
+};
+
+/**
+ * Set password for a user (enables dual auth)
+ * Calls the account linking lambda which now supports password setting
+ */
+export const setPasswordForUser = async (
+  email: string,
+  password: string,
+  idToken: string
+): Promise<void> => {
+  const apiGatewayUrl = import.meta.env.VITE_API_GATEWAY_URL;
+  
+  if (!apiGatewayUrl) {
+    throw new Error('API Gateway URL is not configured');
+  }
+
+  // Use the same endpoint as account linking
+  const linkAccountUrl = apiGatewayUrl.replace(/\/response$/, '/link-account');
+
+  const response = await fetch(linkAccountUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({
+      action: 'setPassword',
+      email,
+      password,
+      idToken,
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to set password';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      errorMessage = `Failed to set password: ${response.status} ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to set password');
+  }
+};
+
+/**
+ * Check if current user's email is verified
+ * If not, triggers verification flow
+ */
+export const ensureEmailVerified = async (user: CognitoUserData): Promise<boolean> => {
+  // If we have an ID token, check the email_verified claim
+  if (user.idToken) {
+    try {
+      const payload = JSON.parse(atob(user.idToken.split('.')[1]));
+      if (payload.email_verified === false) { // Explicitly false
+        return false;
+      }
+      if (payload.email_verified === 'false') { // String false
+        return false;
+      }
+      // If true or undefined (some providers don't send it if true), assume true for now
+      // unless we want strict enforcement. Google usually sends it as true.
+      return true;
+    } catch {
+      // Token parsing failed, assume unverified to be safe
+      return false;
+    }
+  }
+  return false;
 };
 
 /**

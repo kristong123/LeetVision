@@ -280,16 +280,15 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
   // Note: We manually encode parameters to ensure proper formatting
   // Cognito is sensitive to scope encoding - spaces should be encoded as %20, not +
   // identity_provider should match the provider name configured in Cognito
-  // Try lowercase 'google' first as some Cognito configurations are case-sensitive
-  // If this fails, try without identity_provider parameter to show provider selection
-  const identityProvider = 'google'; // Try lowercase first (some Cognito configs are case-sensitive)
+  // Use 'Google' (Capitalized) as this is the default name when adding Google provider
+  const identityProvider = 'Google';
   
   const params = [
     `client_id=${encodeURIComponent(CLIENT_ID)}`,
     `response_type=${encodeURIComponent('code')}`,
     `scope=${encodeURIComponent(scopeString)}`, // Encode scope with spaces as %20
     `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
-    `identity_provider=${encodeURIComponent(identityProvider)}`, // Use lowercase 'google'
+    `identity_provider=${encodeURIComponent(identityProvider)}`,
   ].join('&');
 
   const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params}`;

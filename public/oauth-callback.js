@@ -5,17 +5,17 @@ const error = urlParams.get('error');
 const errorDescription = urlParams.get('error_description');
 
 // Log OAuth callback details for debugging
-console.log('OAuth callback received:', { 
-  code: code ? 'present' : 'missing', 
-  error: error || 'none', 
+console.log('OAuth callback received:', {
+  code: code ? 'present' : 'missing',
+  error: error || 'none',
   errorDescription: errorDescription || 'none',
-  fullUrl: window.location.href 
+  fullUrl: window.location.href
 });
 
 if (error) {
   // Build detailed error message
   let errorMessage = errorDescription || error;
-  
+
   // Provide helpful context for common errors
   const errorLower = error.toLowerCase();
   if (errorLower === 'invalid_scope' || errorLower.includes('invalid scope')) {
@@ -29,7 +29,7 @@ if (error) {
     errorMessage = `Redirect URI error: ${errorDescription || error}. ` +
       'Please verify the callback URL matches your Cognito App Client settings.';
   }
-  
+
   // Log error details for debugging
   console.error('OAuth error details:', {
     errorCode: error,
@@ -39,7 +39,7 @@ if (error) {
   });
   console.error('Raw error from URL:', error);
   console.error('Error description from URL:', errorDescription);
-  
+
   // Store error in extension storage
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.local.set({
@@ -50,7 +50,7 @@ if (error) {
       },
     });
   }
-  
+
   document.querySelector('.container').innerHTML = `
     <div style="color: #dc2626;">
       <h2>Sign-in Error</h2>
@@ -61,11 +61,8 @@ if (error) {
       <p style="font-size: 0.875rem; margin-top: 1rem;">You can close this tab.</p>
     </div>
   `;
-  
-  // Close tab after a delay
-  setTimeout(() => {
-    window.close();
-  }, 5000); // Increased delay to allow reading error message
+
+  // No auto-close on error - let user read the message
 } else if (code) {
   // Store code in extension storage
   if (typeof chrome !== 'undefined' && chrome.storage) {
@@ -81,11 +78,8 @@ if (error) {
       <p>You can close this tab and return to the extension.</p>
     </div>
   `;
-  
-  // Close tab after a short delay
-  setTimeout(() => {
-    window.close();
-  }, 2000);
+
+  // No auto-close on success - let user close manually
 } else {
   // Store error
   if (typeof chrome !== 'undefined' && chrome.storage) {
@@ -102,9 +96,7 @@ if (error) {
       <p style="font-size: 0.875rem; margin-top: 1rem;">You can close this tab.</p>
     </div>
   `;
-  
-  setTimeout(() => {
-    window.close();
-  }, 3000);
+
+  // No auto-close
 }
 

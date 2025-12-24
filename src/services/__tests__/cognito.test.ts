@@ -1,4 +1,10 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+// Mock environment variables before importing cognito
+vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'us-east-2_mock123');
+vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'jjt69oab9uo8bkmjqtmkoc2os');
+vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://us-east-2hpx0kaxqh.auth.us-east-2.amazoncognito.com');
+
 import * as cognitoService from '../cognito';
 
 const mocks = vi.hoisted(() => ({

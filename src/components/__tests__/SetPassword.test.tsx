@@ -24,6 +24,7 @@ const renderWithRedux = (component: React.ReactElement) => {
         },
         loading: false,
         error: null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any,
     },
   });
@@ -62,8 +63,8 @@ describe('SetPassword Component', () => {
   });
 
   it('should call setPasswordForUser on success', async () => {
-    (cognitoService.setPasswordForUser as any).mockResolvedValue(undefined);
-    (cognitoService.getIdToken as any).mockResolvedValue('mock-token');
+    vi.mocked(cognitoService.setPasswordForUser).mockResolvedValue(undefined);
+    vi.mocked(cognitoService.getIdToken).mockResolvedValue('mock-token');
 
     renderWithRedux(<SetPassword onClose={mockOnClose} onSuccess={mockOnSuccess} />);
 

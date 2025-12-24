@@ -10,6 +10,7 @@ describe('userSlice', () => {
       responseLength: 2,
       selectedMode: 'explain' as const,
       displayMode: 'floating' as const
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any, // using cast for any extra props not strictly in mocked/minimal type if needed
     loading: false,
     error: null,

@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import * as cognitoService from '../cognito';
 import browser from 'webextension-polyfill';
@@ -55,7 +55,7 @@ describe('Cognito Service', () => {
       const createSpy = browser.tabs.create;
       
       // Ensure storage set succeeds
-      (browser.storage.local.set as any).mockResolvedValue(undefined);
+      (browser.storage.local.set as unknown as Mock).mockResolvedValue(undefined);
 
       // Verify auth URL generation
       cognitoService.signInWithGoogle();
@@ -65,7 +65,7 @@ describe('Cognito Service', () => {
         expect(browser.tabs.create).toHaveBeenCalledTimes(1);
       });
       
-      const callArgs = (createSpy as any).mock.calls[0][0];
+      const callArgs = (createSpy as unknown as Mock).mock.calls[0][0];
       const authUrl = callArgs.url;
       
       console.log('OAuth URL (should redirect to Google):', authUrl);
@@ -83,7 +83,7 @@ describe('Cognito Service', () => {
 
     it('should set oauth_pending state', async () => {
       // Mock storage.local.set to succeed
-      (browser.storage.local.set as any).mockResolvedValue(undefined);
+      (browser.storage.local.set as unknown as Mock).mockResolvedValue(undefined);
       
       cognitoService.signInWithGoogle();
       
@@ -101,13 +101,13 @@ describe('Cognito Service', () => {
 
   describe('handlePendingOAuth', () => {
     it('should return null if no pending state', async () => {
-      (browser.storage.local.get as any).mockResolvedValue({});
+      (browser.storage.local.get as unknown as Mock).mockResolvedValue({});
       const result = await cognitoService.handlePendingOAuth();
       expect(result).toBeNull();
     });
 
     it('should throw error if oauth_result contains error', async () => {
-      (browser.storage.local.get as any).mockResolvedValue({
+      (browser.storage.local.get as unknown as Mock).mockResolvedValue({
         oauth_pending: true,
         oauth_result: { error: 'Access denied' }
       });

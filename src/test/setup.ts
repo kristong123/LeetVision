@@ -22,7 +22,7 @@ vi.mock('webextension-polyfill', () => {
         },
       },
       tabs: {
-        create: vi.fn().mockResolvedValue({ id: 123 } as any),
+        create: vi.fn().mockResolvedValue({ id: 123 } as unknown as any),
         query: vi.fn().mockResolvedValue([]),
       },
     }
@@ -30,9 +30,9 @@ vi.mock('webextension-polyfill', () => {
 });
 
 declare global {
-  // eslint-disable-next-line no-var
+  // eslint-disable-next-line no-var, @typescript-eslint/no-explicit-any
   var browser: any;
-  // eslint-disable-next-line no-var
+  // eslint-disable-next-line no-var, @typescript-eslint/no-explicit-any
   var chrome: any;
 }
 
@@ -65,10 +65,10 @@ const browserMock = {
 };
 
 // Mock browser global
-global.browser = browserMock as any;
+global.browser = browserMock as unknown as any;
 
 // Mock chrome global (sometimes used as fallback)
-global.chrome = browserMock as any;
+global.chrome = browserMock as unknown as any;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {

@@ -42,8 +42,8 @@ const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || '';
 const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN || '';
 const REDIRECT_URI = browser.runtime.getURL('oauth-callback.html');
 
-// Validate required configuration
-if (!USER_POOL_ID || !CLIENT_ID) {
+// Validate required configuration (skip in test environment)
+if ((!USER_POOL_ID || !CLIENT_ID) && import.meta.env.MODE !== 'test') {
   console.error('Cognito configuration missing. Please set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID in your .env file');
   throw new Error('Cognito configuration is missing. Check your .env file.');
 }

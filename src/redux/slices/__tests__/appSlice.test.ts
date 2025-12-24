@@ -21,7 +21,7 @@ describe('appSlice', () => {
   };
 
   it('should handle initial state', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     expect(appReducer(undefined, { type: 'unknown' })).toEqual(expect.objectContaining({
       mode: 'learn',
       responseLength: 1,

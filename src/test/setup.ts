@@ -22,7 +22,8 @@ vi.mock('webextension-polyfill', () => {
         },
       },
       tabs: {
-        create: vi.fn().mockResolvedValue({ id: 123 } as unknown as any),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        create: vi.fn().mockResolvedValue({ id: 123 } as any),
         query: vi.fn().mockResolvedValue([]),
       },
     }
@@ -30,9 +31,9 @@ vi.mock('webextension-polyfill', () => {
 });
 
 declare global {
-  // eslint-disable-next-line no-var, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   var browser: any;
-  // eslint-disable-next-line no-var, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   var chrome: any;
 }
 
@@ -40,10 +41,12 @@ declare global {
 const browserMock = {
   storage: {
     local: {
-      get: vi.fn(),
-      set: vi.fn(),
-      remove: vi.fn(),
-      clear: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    get: vi.fn().mockResolvedValue({} as any),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    set: vi.fn().mockResolvedValue(undefined as any),
+    remove: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn().mockResolvedValue(undefined),
     },
     onChanged: {
       addListener: vi.fn(),
@@ -60,15 +63,18 @@ const browserMock = {
   tabs: {
     query: vi.fn(),
     sendMessage: vi.fn(),
-    create: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    create: vi.fn().mockResolvedValue({ id: 123 } as any),
   },
 };
 
 // Mock browser global
-global.browser = browserMock as unknown as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+global.browser = browserMock as any;
 
 // Mock chrome global (sometimes used as fallback)
-global.chrome = browserMock as unknown as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+global.chrome = browserMock as any;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {

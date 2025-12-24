@@ -294,15 +294,7 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
 
   const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params}`;
   
-  // Debug: log the URL and configuration
-  console.log('OAuth URL (should redirect to Google):', authUrl);
-  console.log('Redirect URI:', REDIRECT_URI);
-  console.log('Cognito Domain:', COGNITO_DOMAIN);
-  console.log('Requested scopes:', scopeString);
-  console.log('Identity provider:', identityProvider);
-  console.log('Scope parameter in URL:', authUrl.match(/scope=([^&]+)/)?.[1] || 'not found');
-  console.log('Expected flow: Cognito → Google → Cognito → Extension callback');
-  console.log('Note: If you see invalid_scope error, verify Cognito App Client has these scopes enabled: openid, email, profile');
+
   
   // Validate that the scope parameter is properly formatted
   if (!authUrl.includes('scope=')) {
@@ -317,7 +309,7 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
 
   // Store pending auth state
   await browser.storage.local.set({ oauth_pending: true });
-
+  
   return new Promise((resolve, reject) => {
     let tabId: number | undefined;
     let interval: NodeJS.Timeout | undefined;

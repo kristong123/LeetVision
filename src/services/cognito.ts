@@ -289,6 +289,7 @@ export const signInWithGoogle = async (): Promise<CognitoUserData> => {
     `scope=${encodeURIComponent(scopeString)}`, // Encode scope with spaces as %20
     `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
     `identity_provider=${encodeURIComponent(identityProvider)}`,
+    `prompt=${encodeURIComponent('select_account')}`,
   ].join('&');
 
   const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params}`;

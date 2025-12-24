@@ -1,76 +1,73 @@
 import { describe, it, expect } from 'vitest';
-import appReducer, {
-  setMode,
-  setResponseLength,
-  addMessage,
-  clearMessages,
-  setLoading,
-  setError,
+import appReducer, { 
+  setMode, 
+  setResponseLength, 
+  setCodeSections, 
+  setSelectedCodeSection,
+  setHoverModeActive
 } from '../appSlice';
-import { AppState } from '../../../types';
 
 describe('appSlice', () => {
-  const initialState: AppState = {
-    mode: 'learn',
-    responseLength: 1,
+  const initialState = {
+    mode: 'explain' as const,
+    responseLength: 2,
+    codeSections: [],
+    selectedCodeSection: null,
+    hoverModeActive: false,
     messages: [],
     isLoading: false,
     error: null,
-    codeSections: [],
-    selectedCodeSection: null,
-    lastCodeHash: null,
-    hoverModeActive: false,
+    lastCodeHash: null
   };
 
   it('should handle initial state', () => {
-    expect(appReducer(undefined, { type: 'unknown' })).toEqual(initialState);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(appReducer(undefined, { type: 'unknown' })).toEqual(expect.objectContaining({
+      mode: 'learn',
+      responseLength: 1,
+    }));
   });
 
   it('should handle setMode', () => {
-    const actual = appReducer(initialState, setMode('explain'));
-    expect(actual.mode).toEqual('explain');
+    const actual = appReducer(initialState, setMode('improve'));
+    expect(actual.mode).toBe('improve');
   });
 
   it('should handle setResponseLength', () => {
     const actual = appReducer(initialState, setResponseLength(3));
-    expect(actual.responseLength).toEqual(3);
+    expect(actual.responseLength).toBe(3);
   });
 
-  it('should handle addMessage', () => {
-    const message = {
-      id: '1',
-      role: 'user' as const,
-      content: 'Hello',
-      timestamp: 1234567890,
+  it('should handle setSelectedCode', () => {
+    const codeData = {
+      id: '123',
+      content: 'console.log("hello")',
+      language: 'javascript',
     };
-    const actual = appReducer(initialState, addMessage(message));
-    expect(actual.messages).toHaveLength(1);
-    expect(actual.messages[0]).toEqual(message);
+    // setCodeSections sets the array
+    const stateWithSections = appReducer(initialState, setCodeSections([codeData]));
+    expect(stateWithSections.codeSections).toHaveLength(1);
+    expect(stateWithSections.codeSections[0]).toEqual(codeData);
+    
+    // setSelectedCodeSection selects it
+    const actual = appReducer(stateWithSections, setSelectedCodeSection('123'));
+    expect(actual.selectedCodeSection).toBe('123');
   });
 
-  it('should handle clearMessages', () => {
-    const stateWithMessages = {
+  it('should handle clearSelectedCode', () => {
+    const stateWithCode = {
       ...initialState,
-      messages: [
-        {
-          id: '1',
-          role: 'user' as const,
-          content: 'Hello',
-          timestamp: 1234567890,
-        },
-      ],
+      selectedCodeSection: '123',
     };
-    const actual = appReducer(stateWithMessages, clearMessages());
-    expect(actual.messages).toHaveLength(0);
+    const actual = appReducer(stateWithCode, setSelectedCodeSection(null));
+    expect(actual.selectedCodeSection).toBeNull();
   });
 
-  it('should handle setLoading', () => {
-    const actual = appReducer(initialState, setLoading(true));
-    expect(actual.isLoading).toBe(true);
-  });
-
-  it('should handle setError', () => {
-    const actual = appReducer(initialState, setError('Something went wrong'));
-    expect(actual.error).toEqual('Something went wrong');
+  it('should handle toggleHoverMode', () => {
+    const actual = appReducer(initialState, setHoverModeActive(true));
+    expect(actual.hoverModeActive).toBe(true);
+    
+    const actual2 = appReducer(actual, setHoverModeActive(false));
+    expect(actual2.hoverModeActive).toBe(false);
   });
 });

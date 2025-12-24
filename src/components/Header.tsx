@@ -21,7 +21,7 @@ const Header = ({ onSettingsClick, onAuthClick }: HeaderProps) => {
           onClick={() => setShowDropdown(!showDropdown)}
           className="w-7 h-7 rounded-lg hover:bg-vscode-list-hover flex items-center justify-center transition-colors duration-100"
         >
-          {isAuthenticated && (user?.displayName || user?.email) ? (
+          {isAuthenticated && user ? (
             <span className="text-xs font-medium text-vscode-text">
               {(user.displayName || user.email || '?').charAt(0).toUpperCase()}
             </span>

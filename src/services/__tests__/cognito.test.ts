@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import * as cognitoService from '../cognito';
 import browser from 'webextension-polyfill';
@@ -58,7 +58,7 @@ describe('Cognito Service', () => {
       (browser.storage.local.set as any).mockResolvedValue(undefined);
 
       // Verify auth URL generation
-      const authPromise = cognitoService.signInWithGoogle();
+      cognitoService.signInWithGoogle();
       
       // Wait for async operations (storage.set) to complete
       await waitFor(() => {
@@ -85,7 +85,7 @@ describe('Cognito Service', () => {
       // Mock storage.local.set to succeed
       (browser.storage.local.set as any).mockResolvedValue(undefined);
       
-      const authPromise = cognitoService.signInWithGoogle();
+      cognitoService.signInWithGoogle();
       
       // Force cleanup to avoid timeout
       // Simulate listener call if addListener was called

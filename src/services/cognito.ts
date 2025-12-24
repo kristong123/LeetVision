@@ -37,12 +37,19 @@ import browser from 'webextension-polyfill';
  */
 
 // Cognito configuration from environment variables
-const USER_POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID || '';
-const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || '';
-const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN || '';
+// Use test defaults in test environment, otherwise use env vars
+const USER_POOL_ID = import.meta.env.MODE === 'test' 
+  ? 'us-east-2_TESTPOOL123'
+  : (import.meta.env.VITE_COGNITO_USER_POOL_ID || '');
+const CLIENT_ID = import.meta.env.MODE === 'test'
+  ? 'test-client-id-123456'
+  : (import.meta.env.VITE_COGNITO_CLIENT_ID || '');
+const COGNITO_DOMAIN = import.meta.env.MODE === 'test'
+  ? 'https://test-domain.auth.us-east-2.amazoncognito.com'
+  : (import.meta.env.VITE_COGNITO_DOMAIN || '');
 const REDIRECT_URI = browser.runtime.getURL('oauth-callback.html');
 
-// Validate required configuration (skip in test environment)
+// Validate required configuration (only in non-test environments)
 if ((!USER_POOL_ID || !CLIENT_ID) && import.meta.env.MODE !== 'test') {
   console.error('Cognito configuration missing. Please set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID in your .env file');
   throw new Error('Cognito configuration is missing. Check your .env file.');

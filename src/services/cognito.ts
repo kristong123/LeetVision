@@ -94,7 +94,7 @@ export const signInWithEmail = async (
         const userData: CognitoUserData = {
           uid: payload.sub,
           email: payload.email || email,
-          displayName: payload.name || payload['cognito:username'] || null,
+          displayName: payload.name || null,
           idToken,
           accessToken,
         };
@@ -523,7 +523,7 @@ async function exchangeCodeForTokens(code: string): Promise<CognitoUserData> {
   const userData: CognitoUserData = {
     uid: payload.sub,
     email: payload.email || null,
-    displayName: payload.name || payload['cognito:username'] || null,
+    displayName: payload.name || null,
     idToken: id_token,
     accessToken: access_token,
   };
@@ -736,7 +736,7 @@ export const getCurrentUser = async (): Promise<CognitoUserData | null> => {
       const userData: CognitoUserData = {
         uid: payload.sub,
         email: payload.email || null,
-        displayName: payload.name || payload['cognito:username'] || null,
+        displayName: payload.name || null,
         idToken,
         accessToken,
       };
